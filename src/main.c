@@ -2,6 +2,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 #define QTD_OPCODES 17
 #define QTD_REGS 32
@@ -16,21 +17,51 @@ typedef struct {
   tipo t;
 } CodeTipo;
 
+typedef struct {
+  uint32_t tamanho_memoria;
+  char *nome_programa;
+  char *nome_saida;
+} Programa;
+
+typedef struct {
+  uint32_t uf_add;
+  uint32_t uf_mul;
+  uint32_t uf_int;
+
+  uint32_t clock_add;
+  uint32_t clock_addi;
+  uint32_t clock_sub;
+  uint32_t clock_subi;
+  uint32_t clock_mul;
+  uint32_t clock_div;
+  uint32_t clock_and;
+  uint32_t clock_or;
+  uint32_t clock_not;
+  uint32_t clock_blt;
+  uint32_t clock_bgt;
+  uint32_t clock_beq;
+  uint32_t clock_bne;
+  uint32_t clock_jump;
+  uint32_t clock_load;
+  uint32_t clock_store;
+  uint32_t clock_exit;
+} ArqAsb;
+
 // Constantes de Instrução
-const CodeMap OpCodeMap[QTD_OPCODES] = {
+static const CodeMap OpCodeMap[QTD_OPCODES] = {
     {"ADD", 0x0},   {"ADDI", 0x1},  {"SUB", 0x2}, {"SUBI", 0x3}, {"MUL", 0x4},
     {"DIV", 0x5},   {"AND", 0x6},   {"OR", 0x7},  {"NOT", 0x8},  {"BLT", 0x9},
     {"BGT", 0xA},   {"BEQ", 0xB},   {"BNE", 0xC}, {"JUMP", 0xD}, {"LOAD", 0xE},
     {"STORE", 0xF}, {"EXIT", 0x10},
 };
 
-const CodeTipo OpCodeTipo[QTD_OPCODES] = {
+static const CodeTipo OpCodeTipo[QTD_OPCODES] = {
     {"ADD", R}, {"ADDI", I}, {"SUB", R},  {"SUBI", I},  {"MUL", R},  {"DIV", R},
     {"AND", R}, {"OR", R},   {"NOT", R},  {"BLT", I},   {"BGT", I},  {"BEQ", I},
     {"BNE", I}, {"JUMP", J}, {"LOAD", I}, {"STORE", I}, {"EXIT", J},
 };
 
-const CodeMap RegCodeMap[QTD_REGS] = {
+static const CodeMap RegCodeMap[QTD_REGS] = {
     {"R0", 0x0},   {"R1", 0x1},   {"R2", 0x2},   {"R3", 0x3},   {"R4", 0x4},
     {"R5", 0x5},   {"R6", 0x6},   {"R7", 0x7},   {"R8", 0x8},   {"R9", 0x9},
     {"R10", 0xA},  {"R11", 0xB},  {"R12", 0xC},  {"R13", 0xD},  {"R14", 0xE},
@@ -43,14 +74,33 @@ const CodeMap RegCodeMap[QTD_REGS] = {
 static ins_t codificar(char *instrucao);
 static uint8_t get_registrador(const char *registrador);
 static void decodificar(ins_t instrucao);
+static void definir_programa(Programa *programa, int argc, char *argv[]);
+static void print_ajuda(void);
 
-int main(void) {
+int main(int argc, char *argv[]) {
+  Programa programa = {0};
+  definir_programa(&programa, argc, argv);
+
+  uint32_t memoria[programa.tamanho_memoria];
+
+  FILE *arq = fopen(programa.nome_programa, "r");
+  if (arq == NULL) {
+    fprintf(stderr, "Erro ao abrir o arquivo.\n");
+    exit(1);
+  }
+
+  char buffer[128];
+  while (fgets(buffer, 128, arq) != NULL) {
+    printf("%s", buffer);
+  }
   char instrucao[128] = "ADD R1, R2, R3";
   ins_t t = codificar(instrucao);
   printf("%08X\n", t.tipo);
   printf("%08X\n", t.valor);
 
   decodificar(t);
+
+  fclose(arq);
 
   return 0;
 }
@@ -146,4 +196,44 @@ static void decodificar(ins_t instrucao) {
   printf("Opcode: %u\nRD: %u\nRS: %u\nRT: %u\nIMM: %u\nEXTRA: %u\n"
          "Endereço: %u\n",
          opcode, rd, rs, rt, imm, extra, end);
+}
+
+static void definir_programa(Programa *programa, int argc, char *argv[]) {
+  int opt;
+  while ((opt = getopt(argc, argv, "p:m:o:h")) != -1) {
+    switch (opt) {
+    case 'p':
+      if (strncmp(optarg + strlen(optarg) - 4, ".asb", 4) == 0) {
+        programa->nome_programa = optarg;
+      } else {
+        fprintf(stderr, "Extensão inválida, por favor use um arquivo \".asb\".\n");
+        exit(1);
+      }
+      break;
+
+    case 'm':
+      programa->tamanho_memoria = atoi(optarg);
+      if (programa->tamanho_memoria == 0) {
+        fprintf(stderr, "Valor inválido para o tamanho da memória.\n");
+        exit(1);
+      }
+      break;
+
+    case 'o':
+      programa->nome_saida = optarg;
+      break;
+
+    case 'h':
+      print_ajuda();
+      exit(0);
+    }
+  }
+
+  if (programa->nome_saida == NULL) {
+    programa->nome_saida = "scoreboarding";
+  }
+}
+
+static void print_ajuda(void) {
+  printf("Ajuda\n");
 }

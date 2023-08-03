@@ -1,0 +1,134 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  sub: 2
+  jump: 1
+
+
+
+
+
+
+
+
+
+
+
+
+
+  ---------------
+*/
+
+.data
+  var0: .word 4
+  var1: .word 4
+  var2: .word 4
+  var3: .word 4
+  var4: .word 4
+  var5: .word 4
+  var6: .word 4
+  var7: .word 4
+  var8: .word 4
+  var9: .word 4
+  var10: .word 4
+  var11: .word 4
+  var12: .word 4
+  var13: .word 4
+  var14: .word 4
+  var15: .word 4
+  var16: .word 4
+  var17: .word 4
+  var18: .word 4
+  var19: .word 4
+  var20: .word 4
+  var21: .word 4
+  var22: .word 4
+  var23: .word 4
+  var24: .word 4
+  var25: .word 4
+  var26: .word 4
+  var27: .word 4
+  var28: .word 4
+  var29: .word 4
+  var30: .word 4
+  var31: .word 4
+  var32: .word 4
+  var33: .word 4
+  var34: .word 4
+  var35: .word 4
+  var36: .word 4
+  var37: .word 4
+  var38: .word 4
+  var39: .word 4
+  var40: .word 4
+  var41: .word 4
+  var42: .word 4
+  var43: .word 4
+  var44: .word 4
+  var45: .word 4
+  var46: .word 4
+  var47: .word 4
+  var48: .word 4
+  var49: .word 4
+  var50: .word 4
+  var51: .word 4
+  var52: .word 4
+  var53: .word 4
+  var54: .word 4
+  var55: .word 4
+  var56: .word 4
+  var57: .word 4
+  var58: .word 4
+  var59: .word 4
+  var60: .word 4
+  var61: .word 4
+  var62: .word 4
+  var63: .word 4
+  var64: .word 4
+  var65: .word 4
+  var66: .word 4
+  var67: .word 4
+  var68: .word 4
+  var69: .word 4
+  var70: .word 4
+  var71: .word 4
+  var72: .word 4
+  var73: .word 4
+  var74: .word 4
+  var75: .word 4
+  var76: .word 4
+  var77: .word 4
+  var78: .word 4
+  var79: .word 4
+  var80: .word 4
+  var81: .word 4
+  var82: .word 4
+  var83: .word 4
+  var84: .word 4
+  var85: .word 4
+  var86: .word 4
+  var87: .word 4
+  var88: .word 4
+  var89: .word 4
+  var90: .word 4
+  var91: .word 4
+  var92: .word 4
+  var93: .word 4
+  var94: .word 4
+  var95: .word 4
+  var96: .word 4
+  var97: .word 4
+  var98: .word 4
+  var99: .word 4
+
+.text
+.globl _main
+
+main:
+  add r1, r2, r3
+  sub r0, r3, r5
+  jump 021

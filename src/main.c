@@ -1,21 +1,10 @@
 #include "memoria.h"
+#include "opcodehash.h"
+#include "reghash.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-#define QTD_OPCODES 17
-#define QTD_REGS 32
-
-typedef struct {
-  char nome[5];
-  uint8_t opcode;
-} CodeMap;
-
-typedef struct {
-  char nome[5];
-  tipo t;
-} CodeTipo;
 
 typedef struct {
   uint32_t tamanho_memoria;
@@ -47,30 +36,6 @@ typedef struct {
   uint32_t clock_exit;
 } ArqAsb;
 
-// Constantes de Instrução
-static const CodeMap OpCodeMap[QTD_OPCODES] = {
-    {"ADD", 0x0},   {"ADDI", 0x1},  {"SUB", 0x2}, {"SUBI", 0x3}, {"MUL", 0x4},
-    {"DIV", 0x5},   {"AND", 0x6},   {"OR", 0x7},  {"NOT", 0x8},  {"BLT", 0x9},
-    {"BGT", 0xA},   {"BEQ", 0xB},   {"BNE", 0xC}, {"JUMP", 0xD}, {"LOAD", 0xE},
-    {"STORE", 0xF}, {"EXIT", 0x10},
-};
-
-static const CodeTipo OpCodeTipo[QTD_OPCODES] = {
-    {"ADD", R}, {"ADDI", I}, {"SUB", R},  {"SUBI", I},  {"MUL", R},  {"DIV", R},
-    {"AND", R}, {"OR", R},   {"NOT", R},  {"BLT", I},   {"BGT", I},  {"BEQ", I},
-    {"BNE", I}, {"JUMP", J}, {"LOAD", I}, {"STORE", I}, {"EXIT", J},
-};
-
-static const CodeMap RegCodeMap[QTD_REGS] = {
-    {"R0", 0x0},   {"R1", 0x1},   {"R2", 0x2},   {"R3", 0x3},   {"R4", 0x4},
-    {"R5", 0x5},   {"R6", 0x6},   {"R7", 0x7},   {"R8", 0x8},   {"R9", 0x9},
-    {"R10", 0xA},  {"R11", 0xB},  {"R12", 0xC},  {"R13", 0xD},  {"R14", 0xE},
-    {"R15", 0xF},  {"R16", 0x10}, {"R17", 0x11}, {"R18", 0x12}, {"R19", 0x13},
-    {"R20", 0x14}, {"R21", 0x15}, {"R22", 0x16}, {"R23", 0x17}, {"R24", 0x18},
-    {"R25", 0x19}, {"R26", 0x1A}, {"R27", 0x1B}, {"R28", 0x1C}, {"R29", 0x1D},
-    {"R30", 0x1E}, {"R31", 0x1F},
-};
-
 static ins_t codificar(char *instrucao);
 static uint8_t get_registrador(const char *registrador);
 static void decodificar(ins_t instrucao);
@@ -93,7 +58,7 @@ int main(int argc, char *argv[]) {
   while (fgets(buffer, 128, arq) != NULL) {
     printf("%s", buffer);
   }
-  char instrucao[128] = "ADD R1, R2, R3";
+  char instrucao[128] = "add r1, r2, r3";
   ins_t t = codificar(instrucao);
   printf("%08X\n", t.tipo);
   printf("%08X\n", t.valor);
@@ -110,14 +75,10 @@ static ins_t codificar(char *instrucao) {
 
   uint8_t opcode = 0;
   char *token = strtok(instrucao, " ");
-  for (int i = 0; i < QTD_OPCODES; i++) {
-    if (strncmp(OpCodeMap[i].nome, token, 5) == 0) {
-      opcode = OpCodeMap[i].opcode;
-      ins.valor |= OpCodeMap[i].opcode << 26;
-      ins.tipo = OpCodeTipo[i].t;
-      break;
-    }
-  }
+
+  struct OpCodeMap *op = encontra_operacao(token, strlen(token));
+  ins.valor |= op->opcode << 26;
+  ins.tipo = op->t;
 
   const char delim[] = ", ";
 
@@ -159,12 +120,9 @@ static ins_t codificar(char *instrucao) {
 }
 
 static uint8_t get_registrador(const char *registrador) {
-  for (int i = 0; i < QTD_REGS; i++) {
-    if (strncmp(RegCodeMap[i].nome, registrador, 4) == 0) {
-      return RegCodeMap[i].opcode;
-    }
-  }
-  return 0xFF; // Registrador não encontrado
+  const struct RegHashMap *reg = encontra_reg(registrador, strlen(registrador));
+
+  return reg->identificador;
 }
 
 static void decodificar(ins_t instrucao) {
@@ -206,7 +164,8 @@ static void definir_programa(Programa *programa, int argc, char *argv[]) {
       if (strncmp(optarg + strlen(optarg) - 4, ".asb", 4) == 0) {
         programa->nome_programa = optarg;
       } else {
-        fprintf(stderr, "Extensão inválida, por favor use um arquivo \".asb\".\n");
+        fprintf(stderr,
+                "Extensão inválida, por favor use um arquivo \".asb\".\n");
         exit(1);
       }
       break;
@@ -234,6 +193,4 @@ static void definir_programa(Programa *programa, int argc, char *argv[]) {
   }
 }
 
-static void print_ajuda(void) {
-  printf("Ajuda\n");
-}
+static void print_ajuda(void) { printf("Ajuda\n"); }

@@ -8,6 +8,10 @@
 %define lookup-function-name encontra_operacao
 %define hash-function-name hash_operacao
 %struct-type
+%define length-table-name num_operacoes
+%define word-array-name operacoes
+%define constants-prefix OP_
+%enum
 struct OpCodeMap { char *operacao; uint8_t opcode; tipo t; };
 %%
 add, 0x00, R

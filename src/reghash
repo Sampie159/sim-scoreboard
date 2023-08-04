@@ -1,13 +1,14 @@
-%{
-#include <stdint.h>
-%}
 %define hash-function-name hash_reg
 %define lookup-function-name encontra_reg
 %define slot-name reg
 %struct-type
-%includes
 %compare-strncmp
 %switch=1
+%enum
+%readonly-tables
+%define constants-prefix REG_
+%define word-array-name reg_array
+%define length-table-name reg_length
 struct RegHashMap { char *reg; uint8_t identificador; };
 %%
 r0, 0x00

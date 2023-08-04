@@ -1,6 +1,5 @@
+#include "hashtables.h"
 #include "memoria.h"
-#include "opcodehash.h"
-#include "reghash.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

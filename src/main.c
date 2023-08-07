@@ -53,11 +53,16 @@ int main(int argc, char *argv[]) {
     exit(1);
   }
 
-  char buffer[128];
-  while (fgets(buffer, 128, arq) != NULL) {
-    printf("%s", buffer);
-  }
-  char instrucao[128] = "add r1, r2, r3";
+  fseek(arq, 0, SEEK_END);
+  unsigned long tamanho = ftell(arq);
+  fseek(arq, 0, SEEK_SET);
+
+  char buffer[tamanho];
+  fread(buffer, sizeof(char), tamanho, arq);
+  buffer[tamanho] = '\0';
+  printf("%s\n", buffer);
+
+  char instrucao[128] = "addi r1, r2, 10";
   ins_t t = codificar(instrucao);
   printf("%08X\n", t.tipo);
   printf("%08X\n", t.valor);
@@ -72,7 +77,6 @@ int main(int argc, char *argv[]) {
 static ins_t codificar(char *instrucao) {
   ins_t ins = {0};
 
-  uint8_t opcode = 0;
   char *token = strtok(instrucao, " ");
 
   struct OpCodeMap *op = encontra_operacao(token, strlen(token));
@@ -89,7 +93,7 @@ static ins_t codificar(char *instrucao) {
 
     break;
   case I:
-    switch (opcode) {
+    switch (op->opcode) {
     case 0x1:
     case 0x3:
       ins.valor |= get_registrador(strtok(NULL, delim)) << 16; // rt
@@ -105,7 +109,6 @@ static ins_t codificar(char *instrucao) {
       ins.valor |= atoi(strtok(NULL, delim));                  // imm
       break;
     }
-
     break;
   case J:
     ins.valor |= atoi(strtok(NULL, delim)); // endereço
@@ -130,7 +133,7 @@ static void decodificar(ins_t instrucao) {
   uint16_t imm = 0, extra = 0;
   uint32_t end = 0;
 
-  switch (instrucao.tipo) {
+  switch (OpCodeTipo[opcode]) {
   case R:
     rd = (instrucao.valor >> 11) & 0x1F;
     rs = (instrucao.valor >> 21) & 0x1F;

@@ -462,3 +462,5 @@ const struct RegHashMap *encontra_reg(register const char *str,
   }
   return 0;
 }
+
+static tipo OpCodeTipo[] = {R, I, R, I, R, R, R, R, R, I, I, I, I, J, I, I, J};

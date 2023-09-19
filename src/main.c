@@ -1,3 +1,4 @@
+#include "cpu.h"
 #include "hashtables.h"
 #include "memoria.h"
 #include <stdio.h>
@@ -11,33 +12,11 @@ typedef struct {
   char *nome_saida;
 } Programa;
 
-typedef struct {
-  uint32_t uf_add;
-  uint32_t uf_mul;
-  uint32_t uf_int;
+static int idx = 0;
 
-  uint32_t clock_add;
-  uint32_t clock_addi;
-  uint32_t clock_sub;
-  uint32_t clock_subi;
-  uint32_t clock_mul;
-  uint32_t clock_div;
-  uint32_t clock_and;
-  uint32_t clock_or;
-  uint32_t clock_not;
-  uint32_t clock_blt;
-  uint32_t clock_bgt;
-  uint32_t clock_beq;
-  uint32_t clock_bne;
-  uint32_t clock_jump;
-  uint32_t clock_load;
-  uint32_t clock_store;
-  uint32_t clock_exit;
-} ArqAsb;
-
-static ins_t codificar(char *instrucao);
+static void codificar(char *instrucao, uint32_t *memoria);
 static uint8_t get_registrador(const char *registrador);
-static void decodificar(ins_t instrucao);
+static void decodificar(uint32_t instrucao);
 static void definir_programa(Programa *programa, int argc, char *argv[]);
 static void print_ajuda(void);
 
@@ -55,7 +34,7 @@ int main(int argc, char *argv[]) {
 
   fseek(arq, 0, SEEK_END);
   unsigned long tamanho = ftell(arq);
-  fseek(arq, 0, SEEK_SET);
+  rewind(arq);
 
   char buffer[tamanho];
   fread(buffer, sizeof(char), tamanho, arq);
@@ -63,62 +42,59 @@ int main(int argc, char *argv[]) {
   printf("%s\n", buffer);
 
   char instrucao[128] = "addi r1, r2, 10";
-  ins_t t = codificar(instrucao);
-  printf("%08X\n", t.tipo);
-  printf("%08X\n", t.valor);
+  codificar(instrucao, memoria);
+  printf("%08X\n", memoria[0]);
 
-  decodificar(t);
+  decodificar(memoria[0]);
 
   fclose(arq);
 
   return 0;
 }
 
-static ins_t codificar(char *instrucao) {
-  ins_t ins = {0};
-
+static void codificar(char *instrucao, uint32_t *memoria) {
+  uint32_t ins = 0;
   char *token = strtok(instrucao, " ");
 
   struct OpCodeMap *op = encontra_operacao(token, strlen(token));
-  ins.valor |= op->opcode << 26;
-  ins.tipo = op->t;
+  ins |= op->opcode << 26;
 
   const char delim[] = ", ";
 
-  switch (ins.tipo) {
+  switch (op->t) {
   case R:
-    ins.valor |= get_registrador(strtok(NULL, delim)) << 11; // rd
-    ins.valor |= get_registrador(strtok(NULL, delim)) << 21; // rs
-    ins.valor |= get_registrador(strtok(NULL, delim)) << 16; // rt
+    ins |= get_registrador(strtok(NULL, delim)) << 11; // rd
+    ins |= get_registrador(strtok(NULL, delim)) << 21; // rs
+    ins |= get_registrador(strtok(NULL, delim)) << 16; // rt
 
     break;
   case I:
     switch (op->opcode) {
     case 0x1:
     case 0x3:
-      ins.valor |= get_registrador(strtok(NULL, delim)) << 16; // rt
-      ins.valor |= get_registrador(strtok(NULL, delim)) << 21; // rs
-      ins.valor |= atoi(strtok(NULL, delim));                  // extra
+      ins |= get_registrador(strtok(NULL, delim)) << 16; // rt
+      ins |= get_registrador(strtok(NULL, delim)) << 21; // rs
+      ins |= atoi(strtok(NULL, delim));                  // extra
       break;
     case 0x9:
     case 0xA:
     case 0xB:
     case 0xC:
-      ins.valor |= get_registrador(strtok(NULL, delim)) << 21; // rs
-      ins.valor |= get_registrador(strtok(NULL, delim)) << 16; // rt
-      ins.valor |= atoi(strtok(NULL, delim));                  // imm
+      ins |= get_registrador(strtok(NULL, delim)) << 21; // rs
+      ins |= get_registrador(strtok(NULL, delim)) << 16; // rt
+      ins |= atoi(strtok(NULL, delim));                  // imm
       break;
     }
     break;
   case J:
-    ins.valor |= atoi(strtok(NULL, delim)); // endereço
+    ins |= atoi(strtok(NULL, delim)); // endereço
     break;
   default:
     perror("Tipo de instrução não reconhecido");
     exit(EXIT_FAILURE);
   }
 
-  return ins;
+  memoria[idx++] = ins;
 }
 
 static uint8_t get_registrador(const char *registrador) {
@@ -127,26 +103,26 @@ static uint8_t get_registrador(const char *registrador) {
   return reg->identificador;
 }
 
-static void decodificar(ins_t instrucao) {
-  uint8_t opcode = instrucao.valor >> 26;
+static void decodificar(uint32_t instrucao) {
+  uint8_t opcode = instrucao >> 26;
   uint8_t rd = 0, rs = 0, rt = 0;
   uint16_t imm = 0, extra = 0;
   uint32_t end = 0;
 
   switch (OpCodeTipo[opcode]) {
   case R:
-    rd = (instrucao.valor >> 11) & 0x1F;
-    rs = (instrucao.valor >> 21) & 0x1F;
-    rt = (instrucao.valor >> 16) & 0x1F;
-    extra = instrucao.valor & 0x7FF;
+    rd = (instrucao >> 11) & 0x1F;
+    rs = (instrucao >> 21) & 0x1F;
+    rt = (instrucao >> 16) & 0x1F;
+    extra = instrucao & 0x7FF;
     break;
   case I:
-    rt = (instrucao.valor >> 16) & 0x1F;
-    rs = (instrucao.valor >> 21) & 0x1F;
-    imm = instrucao.valor & 0xFFFF;
+    rt = (instrucao >> 16) & 0x1F;
+    rs = (instrucao >> 21) & 0x1F;
+    imm = instrucao & 0xFFFF;
     break;
   case J:
-    end = instrucao.valor & 0x3FFFFFF;
+    end = instrucao & 0x3FFFFFF;
     break;
   default:
     perror("Tipo de instrução não reconhecido");

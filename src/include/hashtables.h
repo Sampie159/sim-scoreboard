@@ -271,8 +271,7 @@ inline
   return hval;
 }
 
-const struct RegHashMap *encontra_reg(register const char *str,
-                                      register size_t len) {
+uint8_t encontra_reg(register const char *str, register size_t len) {
   enum {
     REG_TOTAL_KEYWORDS = 32,
     REG_MIN_WORD_LENGTH = 2,
@@ -456,7 +455,7 @@ const struct RegHashMap *encontra_reg(register const char *str,
       register const char *s = resword->reg;
 
       if (*str == *s && !strncmp(str + 1, s + 1, len - 1) && s[len] == '\0')
-        return resword;
+        return resword->identificador;
     }
     }
   }

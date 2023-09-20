@@ -1,4 +1,5 @@
 #include "leitor.h"
+
 #include "hashtables.h"
 
 #include <ctype.h>
@@ -6,39 +7,37 @@
 #include <stdlib.h>
 #include <string.h>
 
-// clang-format off
-
-static void adiante(Leitor *l) __attribute__((nonnull));
-static char espiar(Leitor *l) __attribute__((nonnull));
-static void ignorar_espacos(Leitor *l) __attribute__((nonnull));
-static void ler_ufs(Leitor *l, CPU_Specs *cpu_specs) __attribute__((nonnull));
-static void ler_specs(Leitor *l, CPU_Specs *cpu_specs) __attribute__((nonnull));
-static char *ler_palavra(Leitor *l) __attribute__((nonnull));
-static void ignorar_comentario(Leitor *l) __attribute__((nonnull));
-static void ler_dados(Leitor *l, uint32_t *memoria, uint32_t *idx, uint32_t *PC) __attribute__((nonnull));
-static void ler_texto(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-static void ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-static void ler_campos_i_1(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-static void ler_campos_i_2(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-static void ler_campos_i_3(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-static void ler_campos_j(Leitor *l, uint32_t *memoria, uint32_t *idx) __attribute__((nonnull));
-
-// clang-format on
+static void  prosseguir(Leitor *l);
+static char  espiar(Leitor *l);
+static void  ignorar_espacos(Leitor *l);
+static void  ler_ufs(Leitor *l, CPU_Specs *cpu_specs);
+static void  ler_specs(Leitor *l, CPU_Specs *cpu_specs);
+static char *ler_identificador(Leitor *l);
+static void  ignorar_comentario(Leitor *l);
+static void ler_dados(Leitor *l, uint32_t *memoria, uint32_t *idx, uint32_t *PC,
+                      CPU_Specs *cpu_specs);
+static void ler_texto(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_campos_i_1(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_campos_i_2(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_campos_i_3(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_campos_j(Leitor *l, uint32_t *memoria, uint32_t *idx);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
-                        CPU_Specs *cpu_specs) {
+void
+leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
+                   CPU_Specs *cpu_specs) {
   Leitor l;
 
-  l.input = input;
-  l.ch = '\0';
-  l.pos = 0;
+  l.input    = input;
+  l.ch       = '\0';
+  l.pos      = 0;
   l.prox_pos = 0;
 
-  adiante(&l);
+  prosseguir(&l);
 
   uint32_t idx = 0;
 
@@ -49,8 +48,8 @@ void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
     switch (l.ch) {
     case '/':
       if (espiar(&l) == '*') {
-        adiante(&l);
-        adiante(&l);
+        prosseguir(&l);
+        prosseguir(&l);
         ler_specs(&l, cpu_specs);
       } else {
         perror("Erro de sintaxe.");
@@ -60,10 +59,10 @@ void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
 
     case '.':
       if (isalpha(espiar(&l))) {
-        adiante(&l);
-        if (strncmp(ler_palavra(&l), "data", 4) == 0) {
-          ler_dados(&l, memoria, &idx, PC);
-        } else if (strncmp(ler_palavra(&l), "text", 4) == 0) {
+        prosseguir(&l);
+        if (strncmp(ler_identificador(&l), "data", 4) == 0) {
+          ler_dados(&l, memoria, &idx, PC, cpu_specs);
+        } else if (strncmp(ler_identificador(&l), "text", 4) == 0) {
           ler_texto(&l, memoria, &idx);
         } else {
           perror("Erro de sintaxe.");
@@ -75,9 +74,7 @@ void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
       }
       break;
 
-    case '#':
-      ignorar_comentario(&l);
-      break;
+    case '#': ignorar_comentario(&l); break;
     }
   }
 }
@@ -86,7 +83,8 @@ void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
  *                          PRIVATE FUNCTIONS                              *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-static void adiante(Leitor *l) {
+static void
+prosseguir(Leitor *l) {
   if (l->prox_pos < strlen(l->input)) {
     l->ch = l->input[l->prox_pos++];
   } else {
@@ -94,19 +92,22 @@ static void adiante(Leitor *l) {
   }
 }
 
-static void ignorar_espacos(Leitor *l) {
+static void
+ignorar_espacos(Leitor *l) {
   while (isspace(l->ch)) {
-    adiante(l);
+    prosseguir(l);
   }
 }
 
-static void ignorar_comentario(Leitor *l) {
+static void
+ignorar_comentario(Leitor *l) {
   while (l->ch != '\n') {
-    adiante(l);
+    prosseguir(l);
   }
 }
 
-static char espiar(Leitor *l) {
+static char
+espiar(Leitor *l) {
   if (l->prox_pos < strlen(l->input)) {
     return l->input[l->prox_pos];
   } else {
@@ -114,13 +115,14 @@ static char espiar(Leitor *l) {
   }
 }
 
-static char *ler_palavra(Leitor *l) {
+static char *
+ler_identificador(Leitor *l) {
   char *palavra;
-  int pos = 0;
+  int   pos = 0;
 
   while (isalpha(l->ch)) {
     pos++;
-    adiante(l);
+    prosseguir(l);
   }
 
   palavra = malloc(pos + 1);
@@ -129,24 +131,28 @@ static char *ler_palavra(Leitor *l) {
   return palavra;
 }
 
-static void ler_dados(Leitor *l, uint32_t *memoria, uint32_t *idx,
-                      uint32_t *PC) {
+static void
+ler_dados(Leitor *l, uint32_t *memoria, uint32_t *idx, uint32_t *PC,
+          CPU_Specs *cpu_specs) {
   while (l->ch != '\0') {
     ignorar_espacos(l);
   }
+
+  ler_ufs(l, cpu_specs);
 
   if (*memoria || *idx || *PC) {
   }
 }
 
-static void ler_texto(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+static void
+ler_texto(Leitor *l, uint32_t *memoria, uint32_t *idx) {
   struct OpCodeMap *op_code_map = NULL;
 
   while (l->ch != '\0') {
     ignorar_espacos(l);
     if (isalpha(l->ch)) {
-      char *palavra = ler_palavra(l);
-      op_code_map = encontra_operacao(palavra, strlen(palavra));
+      char *palavra  = ler_identificador(l);
+      op_code_map    = encontra_operacao(palavra, strlen(palavra));
       memoria[*idx] |= op_code_map->opcode << 26;
 
       switch (op_code_map->t) {
@@ -172,10 +178,250 @@ static void ler_texto(Leitor *l, uint32_t *memoria, uint32_t *idx) {
         }
         break;
       case J: // j, exit
-        ler_campos_j(l, memoria, idx);
+        if (op_code_map->opcode == 0x13) {
+          ler_campos_j(l, memoria, idx);
+        } else {
+          memoria[*idx] |= 0x0;
+        }
         break;
       }
     }
     idx++;
   }
 }
+
+static void
+ler_specs(Leitor *l, CPU_Specs *cpu_specs) {}
+
+static void
+ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+  // Ignora o espaço entre a operação e o primeiro registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 21;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o primeiro e o segundo registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 16;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o segundo e o terceiro registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 11;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_campos_i_1(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+  // Ignora o espaço entre a operação e o primeiro registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 16;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o primeiro e o segundo registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 21;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o segundo registrador e o valor imediato.
+  ignorar_espacos(l);
+
+  if (isdigit(l->ch)) {
+    char *palavra  = ler_identificador(l);
+    memoria[*idx] |= atoi(palavra);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_campos_i_2(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+  // Ignora o espaço entre a operação e o primeiro registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 21;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o primeiro e o segundo registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 16;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignora o espaço entre o segundo registrador e o valor imediato.
+  ignorar_espacos(l);
+
+  if (isdigit(l->ch)) {
+    char *palavra  = ler_identificador(l);
+    memoria[*idx] |= atoi(palavra);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_campos_i_3(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+  // Ignorar o espaço entre a operação e o primeiro registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 16;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ',') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignorar o espaço entre o primeiro registrador e o valor imediato.
+  ignorar_espacos(l);
+
+  if (isdigit(l->ch)) {
+    char *palavra  = ler_identificador(l);
+    memoria[*idx] |= atoi(palavra);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == '(') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  // Ignorar o espaço entre o valor imediato e o segundo registrador.
+  ignorar_espacos(l);
+
+  if (l->ch == 'r') {
+    char   *identificador  = ler_identificador(l);
+    uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
+    memoria[*idx]         |= registrador << 21;
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+
+  if (l->ch == ')') {
+    prosseguir(l);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_campos_j(Leitor *l, uint32_t *memoria, uint32_t *idx) {
+  // Ignorar o espaço entre a operação e o valor imediato.
+  ignorar_espacos(l);
+
+  if (isdigit(l->ch)) {
+    char *palavra  = ler_identificador(l);
+    memoria[*idx] |= atoi(palavra);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_ufs(Leitor *l, CPU_Specs *cpu_specs) {}

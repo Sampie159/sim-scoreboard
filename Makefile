@@ -9,10 +9,10 @@ OBJDIR = obj
 all: sim-sb
 
 sim-sb: $(OBJS)
-	$(CC) $(CFLAGS) -o $@ $^ -I$(SRCDIR)/include
+	$(CC) $(CFLAGS) -o $@ $^
 
 $(OBJDIR)/%.o: $(SRCDIR)/%.c $(OBJDIR)
-	$(CC) $(CFLAGS) -c -o $@ $< -I$(SRCDIR)/include
+	$(CC) $(CFLAGS) -c -o $@ $< -I $(SRCDIR)/include
 
 $(OBJDIR):
 	mkdir -p $(OBJDIR)

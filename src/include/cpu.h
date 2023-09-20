@@ -1,9 +1,11 @@
+#pragma once
+
 #include <stdint.h>
 
-typedef unsigned int Registrador;
-typedef struct _cpu_specs CPU_Specs;
+typedef unsigned int                Registrador;
+typedef struct _cpu_specs           CPU_Specs;
+typedef struct _scoreboard          Scoreboard;
 typedef struct _banco_registradores Banco_Registradores;
-typedef struct _scoreboard Scoreboard;
 
 struct _cpu_specs {
   uint32_t uf_add;

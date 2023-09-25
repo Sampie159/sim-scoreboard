@@ -22,6 +22,7 @@ static void ler_campos_i_1(Leitor *l, uint32_t *memoria, uint32_t *idx);
 static void ler_campos_i_2(Leitor *l, uint32_t *memoria, uint32_t *idx);
 static void ler_campos_i_3(Leitor *l, uint32_t *memoria, uint32_t *idx);
 static void ler_campos_j(Leitor *l, uint32_t *memoria, uint32_t *idx);
+static void ler_clocks(Leitor *l, CPU_Specs *cpu_specs);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -131,16 +132,12 @@ ler_identificador(Leitor *l) {
   return palavra;
 }
 
+// TODO: Desenvolver esta função
 static void
 ler_dados(Leitor *l, uint32_t *memoria, uint32_t *idx, uint32_t *PC,
           CPU_Specs *cpu_specs) {
   while (l->ch != '\0') {
     ignorar_espacos(l);
-  }
-
-  ler_ufs(l, cpu_specs);
-
-  if (*memoria || *idx || *PC) {
   }
 }
 
@@ -201,7 +198,7 @@ ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx) {
   if (l->ch == 'r') {
     char   *identificador  = ler_identificador(l);
     uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
-    memoria[*idx]         |= registrador << 21;
+    memoria[*idx]         |= registrador << 11;
   } else {
     perror("Erro de sintaxe.");
     exit(EXIT_FAILURE);
@@ -220,7 +217,7 @@ ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx) {
   if (l->ch == 'r') {
     char   *identificador  = ler_identificador(l);
     uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
-    memoria[*idx]         |= registrador << 16;
+    memoria[*idx]         |= registrador << 21;
   } else {
     perror("Erro de sintaxe.");
     exit(EXIT_FAILURE);
@@ -239,7 +236,7 @@ ler_campos_r(Leitor *l, uint32_t *memoria, uint32_t *idx) {
   if (l->ch == 'r') {
     char   *identificador  = ler_identificador(l);
     uint8_t registrador    = encontra_reg(identificador, strlen(identificador));
-    memoria[*idx]         |= registrador << 11;
+    memoria[*idx]         |= registrador << 16;
   } else {
     perror("Erro de sintaxe.");
     exit(EXIT_FAILURE);
@@ -417,6 +414,109 @@ ler_campos_j(Leitor *l, uint32_t *memoria, uint32_t *idx) {
   if (isdigit(l->ch)) {
     char *palavra  = ler_identificador(l);
     memoria[*idx] |= atoi(palavra);
+  } else {
+    perror("Erro de sintaxe.");
+    exit(EXIT_FAILURE);
+  }
+}
+
+static void
+ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
+  ignorar_espacos(l);
+
+  if (isalpha(l->ch)) {
+    char *identificador = ler_identificador(l);
+    if (strncmp(identificador, "add", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_add = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "addi", 4) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_addi = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "sub", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_sub = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "subi", 4) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_subi = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "mul", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_mul = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "div", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_mul = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "and", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_and = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "or", 2) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_or = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "not", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_not = atoi(ler_identificador(l));
+    } else if (strncmp(identificador, "blt", 3) == 0) {
+      if (l->ch == ':') {
+        prosseguir(l);
+      } else {
+        perror("Erro de sintaxe.");
+        exit(EXIT_FAILURE);
+      }
+      ignorar_espacos(l);
+      cpu_specs->clock_blt = atoi(ler_identificador(l));
+    }
   } else {
     perror("Erro de sintaxe.");
     exit(EXIT_FAILURE);

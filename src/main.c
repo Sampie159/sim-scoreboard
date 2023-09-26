@@ -45,11 +45,11 @@ main(int argc, char *argv[]) {
 
   printf("%s\n", buffer);
 
-  char instrucao[128] = "addi r1, r2, 10";
+  // char instrucao[128] = "addi r1, r2, 10";
   printf("%08X\n", memoria[0]);
-  leitor_ler_arquivo(instrucao, memoria, &PC, &cpu_specs);
+  leitor_ler_arquivo(buffer, memoria, &PC, &cpu_specs);
 
-  decodificar(memoria[0]);
+  // decodificar(memoria[0]);
 
   return 0;
 }

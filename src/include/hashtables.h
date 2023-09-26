@@ -80,7 +80,7 @@ inline
   return hval;
 }
 
-inline struct OpCodeMap *
+static inline struct OpCodeMap *
 encontra_operacao(register const char *str, register size_t len) {
   enum {
     OP_TOTAL_KEYWORDS  = 17,
@@ -240,7 +240,7 @@ inline
   return hval;
 }
 
-inline uint8_t
+static inline uint8_t
 encontra_reg(register const char *str, register size_t len) {
   enum {
     REG_TOTAL_KEYWORDS  = 32,

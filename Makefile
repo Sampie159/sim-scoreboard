@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-Wall -Wextra -Wpedantic -g -O3 -std=gnu17
+CFLAGS=-Wall -Wextra -Wpedantic -g -O0 -std=gnu17
 
 SRCS = $(wildcard ${SRCDIR}/*.c)
 SRCDIR = src

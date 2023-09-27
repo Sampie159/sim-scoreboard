@@ -14,10 +14,9 @@ typedef struct {
   char    *nome_saida;
 } Programa;
 
-static uint8_t get_registrador(const char *registrador);
-static void    decodificar(uint32_t instrucao);
-static void    definir_programa(Programa *programa, int argc, char *argv[]);
-static void    print_ajuda(void);
+static void decodificar(uint32_t instrucao);
+static void definir_programa(Programa *programa, int argc, char *argv[]);
+static void print_ajuda(void);
 
 int
 main(int argc, char *argv[]) {
@@ -45,18 +44,15 @@ main(int argc, char *argv[]) {
 
   printf("%s\n", buffer);
 
-  // char instrucao[128] = "addi r1, r2, 10";
   leitor_ler_arquivo(buffer, memoria, &cpu_specs);
   printf("%d\n", *((int *) &memoria[00]));
 
-  // decodificar(memoria[0]);
+  for (size_t i = 100; i < programa.tamanho_memoria; i += 4) {
+    uint32_t instrucao = *((uint32_t *) &memoria[i]);
+    decodificar(instrucao);
+  }
 
   return 0;
-}
-
-static uint8_t
-get_registrador(const char *registrador) {
-  return encontra_reg(registrador, strlen(registrador));
 }
 
 static void
@@ -124,5 +120,9 @@ definir_programa(Programa *programa, int argc, char *argv[]) {
 
 static void
 print_ajuda(void) {
-  printf("Ajuda\n");
+  printf(
+      "Uso: ./scoreboarding -p <arquivo> -m <tamanho> [-o <nome>]\n"
+      "  -p <arquivo>   Arquivo com o código em assembly.\n"
+      "  -m <tamanho>   Tamanho da memória em bytes.\n"
+      "  -o <nome>      Nome do arquivo de saída.\n");
 }

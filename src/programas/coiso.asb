@@ -47,3 +47,4 @@ INST:
   lw r1, 100(r2)
   sw r1, 100(r2)
   j 100
+  exit

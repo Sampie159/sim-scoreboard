@@ -1,6 +1,7 @@
 #include "leitor.h"
 
 #include "cpu.h"
+#include "defs.h"
 #include "hashtables.h"
 
 #include <ctype.h>
@@ -8,22 +9,22 @@
 #include <stdlib.h>
 #include <string.h>
 
-static void  prosseguir(Leitor *l);
-static char  espiar(Leitor *l);
-static void  ignorar_espacos(Leitor *l);
-static void  ler_ufs(Leitor *l, CPU_Specs *cpu_specs);
-static void  ler_specs(Leitor *l, CPU_Specs *cpu_specs);
-static char *ler_identificador(Leitor *l);
-static void  ignorar_comentario(Leitor *l);
-static void  ler_dados(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_texto(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_campos_r(Leitor *l, char *memoria, uint32_t *idx,
-                          const uint8_t opcode);
-static void  ler_campos_i_1(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_campos_i_2(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_campos_i_3(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_campos_j(Leitor *l, char *memoria, uint32_t *idx);
-static void  ler_clocks(Leitor *l, CPU_Specs *cpu_specs);
+internal void  prosseguir(Leitor *l);
+internal char  espiar(Leitor *l);
+internal void  ignorar_espacos(Leitor *l);
+internal void  ler_ufs(Leitor *l, CPU_Specs *cpu_specs);
+internal void  ler_specs(Leitor *l, CPU_Specs *cpu_specs);
+internal char *ler_identificador(Leitor *l);
+internal void  ignorar_comentario(Leitor *l);
+internal void  ler_dados(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_texto(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_campos_r(Leitor *l, char *memoria, uint32_t *idx,
+                            const uint8_t opcode);
+internal void  ler_campos_i_1(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_campos_i_2(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_campos_i_3(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_campos_j(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_clocks(Leitor *l, CPU_Specs *cpu_specs);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -85,7 +86,7 @@ leitor_ler_arquivo(char *input, char *memoria, CPU_Specs *cpu_specs) {
  *                          PRIVATE FUNCTIONS                              *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
-static void
+internal void
 prosseguir(Leitor *l) {
   if (l->prox_pos < strlen(l->input)) {
     l->pos = l->prox_pos;
@@ -95,21 +96,21 @@ prosseguir(Leitor *l) {
   }
 }
 
-static void
+internal void
 ignorar_espacos(Leitor *l) {
   while (isspace(l->ch) != 0) {
     prosseguir(l);
   }
 }
 
-static void
+internal void
 ignorar_comentario(Leitor *l) {
   while (l->ch != '\n') {
     prosseguir(l);
   }
 }
 
-static char
+internal char
 espiar(Leitor *l) {
   if (l->prox_pos < strlen(l->input)) {
     return l->input[l->prox_pos];
@@ -118,7 +119,7 @@ espiar(Leitor *l) {
   }
 }
 
-static char *
+internal char *
 ler_identificador(Leitor *l) {
   char *palavra;
   int   pos     = l->pos;
@@ -135,7 +136,7 @@ ler_identificador(Leitor *l) {
   return palavra;
 }
 
-static void
+internal void
 ler_dados(Leitor *l, char *memoria, uint32_t *idx) {
   while (l->ch != '\0' && l->ch != '.') {
     ignorar_espacos(l);
@@ -147,7 +148,7 @@ ler_dados(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_texto(Leitor *l, char *memoria, uint32_t *idx) {
   struct OpCodeMap op_code_map = { 0 };
 
@@ -197,7 +198,7 @@ ler_texto(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_specs(Leitor *l, CPU_Specs *cpu_specs) {
   while (l->ch != '\0' && l->ch != '*') {
     ignorar_espacos(l);
@@ -233,7 +234,7 @@ ler_specs(Leitor *l, CPU_Specs *cpu_specs) {
   // }
 }
 
-static void
+internal void
 ler_campos_r(Leitor *l, char *memoria, uint32_t *idx, const uint8_t opcode) {
   // Ignora o espaço entre a operação e o primeiro registrador.
   ignorar_espacos(l);
@@ -290,7 +291,7 @@ ler_campos_r(Leitor *l, char *memoria, uint32_t *idx, const uint8_t opcode) {
   }
 }
 
-static void
+internal void
 ler_campos_i_1(Leitor *l, char *memoria, uint32_t *idx) {
   // Ignora o espaço entre a operação e o primeiro registrador.
   ignorar_espacos(l);
@@ -342,7 +343,7 @@ ler_campos_i_1(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_campos_i_2(Leitor *l, char *memoria, uint32_t *idx) {
   // Ignora o espaço entre a operação e o primeiro registrador.
   ignorar_espacos(l);
@@ -394,7 +395,7 @@ ler_campos_i_2(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_campos_i_3(Leitor *l, char *memoria, uint32_t *idx) {
   // Ignorar o espaço entre a operação e o primeiro registrador.
   ignorar_espacos(l);
@@ -453,7 +454,7 @@ ler_campos_i_3(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_campos_j(Leitor *l, char *memoria, uint32_t *idx) {
   // Ignorar o espaço entre a operação e o valor imediato.
   ignorar_espacos(l);
@@ -467,7 +468,7 @@ ler_campos_j(Leitor *l, char *memoria, uint32_t *idx) {
   }
 }
 
-static void
+internal void
 ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
   while (l->ch != '\0' || l->ch != '*') {
     ignorar_espacos(l);
@@ -643,7 +644,7 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
   // }
 }
 
-static void
+internal void
 ler_ufs(Leitor *l, CPU_Specs *cpu_specs) {
   while (l->ch != '\0' && l->ch != '*') {
     ignorar_espacos(l);

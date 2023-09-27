@@ -1,4 +1,5 @@
 #include "cpu.h"
+#include "defs.h"
 #include "hashtables.h"
 #include "leitor.h"
 #include "memoria.h"
@@ -14,9 +15,8 @@ typedef struct {
   char    *nome_saida;
 } Programa;
 
-static void decodificar(uint32_t instrucao);
-static void definir_programa(Programa *programa, int argc, char *argv[]);
-static void print_ajuda(void);
+internal void definir_programa(Programa *programa, int argc, char *argv[]);
+internal void print_ajuda(void);
 
 int
 main(int argc, char *argv[]) {
@@ -55,36 +55,7 @@ main(int argc, char *argv[]) {
   return 0;
 }
 
-static void
-decodificar(uint32_t instrucao) {
-  uint8_t  opcode = instrucao >> 26;
-  uint8_t  rd = 0, rs = 0, rt = 0;
-  uint16_t imm = 0, extra = 0;
-  uint32_t end = 0;
-
-  switch (OpCodeTipo[opcode]) {
-  case R:
-    rd    = (instrucao >> 11) & 0x1F;
-    rs    = (instrucao >> 21) & 0x1F;
-    rt    = (instrucao >> 16) & 0x1F;
-    extra = instrucao & 0x7FF;
-    break;
-  case I:
-    rt  = (instrucao >> 16) & 0x1F;
-    rs  = (instrucao >> 21) & 0x1F;
-    imm = instrucao & 0xFFFF;
-    break;
-  case J: end = instrucao & 0x3FFFFFF; break;
-  default: perror("Tipo de instrução não reconhecido"); exit(EXIT_FAILURE);
-  }
-
-  printf(
-      "Opcode: %u\nRD: %u\nRS: %u\nRT: %u\nIMM: %u\nEXTRA: %u\n"
-      "Endereço: %u\n",
-      opcode, rd, rs, rt, imm, extra, end);
-}
-
-static void
+internal void
 definir_programa(Programa *programa, int argc, char *argv[]) {
   int opt;
   while ((opt = getopt(argc, argv, "p:m:o:h")) != -1) {
@@ -114,15 +85,16 @@ definir_programa(Programa *programa, int argc, char *argv[]) {
   }
 
   if (programa->nome_saida == NULL) {
-    programa->nome_saida = "scoreboarding";
+    programa->nome_saida = "scoreboard.out";
   }
 }
 
-static void
+internal void
 print_ajuda(void) {
   printf(
       "Uso: ./scoreboarding -p <arquivo> -m <tamanho> [-o <nome>]\n"
       "  -p <arquivo>   Arquivo com o código em assembly.\n"
       "  -m <tamanho>   Tamanho da memória em bytes.\n"
-      "  -o <nome>      Nome do arquivo de saída.\n");
+      "  -o <nome>      Nome do arquivo de saída. Padrão: "
+      "\"scoreboard.out\"\n");
 }

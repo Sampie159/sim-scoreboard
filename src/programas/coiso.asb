@@ -22,10 +22,26 @@ INST:
 
 */
 
-.text
-.globl _main
+.data
 
-main:
+.text
+# .globl _main
+
+# main:
   add r1, r2, r3
+  addi r4, r6, 10
   sub r0, r3, r5
-  jump 021
+  subi r0, r3, 10
+  mul r0, r4, r7
+  div r4, r5, r3
+  and r1, r2, r3
+  or r1, r2, r3
+  not r1, r2
+  blt r1, r2, 100
+  bgt r1, r2, 100
+  beq r1, r2, 100
+  bne r1, r2, 100
+  j 021
+  lw r1, 100(r2)
+  sw r1, 100(r2)
+  exit

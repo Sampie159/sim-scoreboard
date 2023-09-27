@@ -80,7 +80,7 @@ inline
   return hval;
 }
 
-static inline struct OpCodeMap *
+static inline struct OpCodeMap
 encontra_operacao(register const char *str, register size_t len) {
   enum {
     OP_TOTAL_KEYWORDS  = 17,
@@ -131,30 +131,30 @@ encontra_operacao(register const char *str, register size_t len) {
     register unsigned int key = hash_operacao(str, len);
 
     if (key <= OP_MAX_HASH_VALUE && key >= OP_MIN_HASH_VALUE) {
-      register struct OpCodeMap *resword;
+      register struct OpCodeMap resword;
 
       switch (key - 1) {
-      case 0: resword = &operacoes[0]; goto compare;
-      case 1: resword = &operacoes[1]; goto compare;
-      case 2: resword = &operacoes[2]; goto compare;
-      case 3: resword = &operacoes[3]; goto compare;
-      case 5: resword = &operacoes[4]; goto compare;
-      case 7: resword = &operacoes[5]; goto compare;
-      case 8: resword = &operacoes[6]; goto compare;
-      case 10: resword = &operacoes[7]; goto compare;
-      case 11: resword = &operacoes[8]; goto compare;
-      case 12: resword = &operacoes[9]; goto compare;
-      case 17: resword = &operacoes[10]; goto compare;
-      case 18: resword = &operacoes[11]; goto compare;
-      case 22: resword = &operacoes[12]; goto compare;
-      case 26: resword = &operacoes[13]; goto compare;
-      case 27: resword = &operacoes[14]; goto compare;
-      case 32: resword = &operacoes[15]; goto compare;
-      case 37: resword = &operacoes[16]; goto compare;
+      case 0: resword = operacoes[0]; goto compare;
+      case 1: resword = operacoes[1]; goto compare;
+      case 2: resword = operacoes[2]; goto compare;
+      case 3: resword = operacoes[3]; goto compare;
+      case 5: resword = operacoes[4]; goto compare;
+      case 7: resword = operacoes[5]; goto compare;
+      case 8: resword = operacoes[6]; goto compare;
+      case 10: resword = operacoes[7]; goto compare;
+      case 11: resword = operacoes[8]; goto compare;
+      case 12: resword = operacoes[9]; goto compare;
+      case 17: resword = operacoes[10]; goto compare;
+      case 18: resword = operacoes[11]; goto compare;
+      case 22: resword = operacoes[12]; goto compare;
+      case 26: resword = operacoes[13]; goto compare;
+      case 27: resword = operacoes[14]; goto compare;
+      case 32: resword = operacoes[15]; goto compare;
+      case 37: resword = operacoes[16]; goto compare;
       }
-      return 0;
+      return (struct OpCodeMap){ 0 };
 compare : {
-  register const char *s = resword->operacao;
+  register const char *s = resword.operacao;
 
   if (*str == *s && !strncmp(str + 1, s + 1, len - 1) && s[len] == '\0') {
     return resword;
@@ -162,7 +162,7 @@ compare : {
 }
     }
   }
-  return 0;
+  return (struct OpCodeMap){ 0 };
 }
 
 /* ANSI-C code produced by gperf version 3.1 */

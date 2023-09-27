@@ -14,5 +14,5 @@ struct _leitor {
   size_t prox_pos;
 };
 
-void leitor_ler_arquivo(char *input, uint32_t *memoria, uint32_t *PC,
-                        CPU_Specs *cpu_specs) __attribute__((nonnull));
+void leitor_ler_arquivo(char *input, char *memoria, CPU_Specs *cpu_specs)
+    __attribute__((nonnull));

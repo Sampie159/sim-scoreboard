@@ -5,24 +5,27 @@ UF:
   inteiro: 5
 INST:
   add: 2
+  addi: 2
   sub: 2
-  j: 1
-  
-
-
-
-
-
-
-
-
-
-
-
-
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
 */
 
 .data
+  10
+  20
+  30
+  40
+  50
 
 .text
 # .globl _main

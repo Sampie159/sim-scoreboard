@@ -46,8 +46,8 @@ main(int argc, char *argv[]) {
   printf("%s\n", buffer);
 
   // char instrucao[128] = "addi r1, r2, 10";
-  printf("%08X\n", memoria[0]);
   leitor_ler_arquivo(buffer, memoria, &cpu_specs);
+  printf("%d\n", *((int *) &memoria[00]));
 
   // decodificar(memoria[0]);
 

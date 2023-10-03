@@ -24,20 +24,21 @@ struct _lista_instrucoes {
   Instrucao_No *fim;
 };
 
-global Lista_Instrucoes lista_emissao    = { 0 };
-global Lista_Instrucoes lista_leitura    = { 0 };
-global Lista_Instrucoes lista_executando = { 0 };
-global Lista_Instrucoes lista_escrita    = { 0 };
-global uint32_t         ClockMap[17]     = { 0 };
-global uint32_t         add_usados = 0, mul_usados = 0, int_usados = 0;
-global int              PC = 100;
-global CPU_Specs        _cpu_specs;
+global Lista_Instrucoes    lista_emissao    = { 0 };
+global Lista_Instrucoes    lista_leitura    = { 0 };
+global Lista_Instrucoes    lista_executando = { 0 };
+global Lista_Instrucoes    lista_escrita    = { 0 };
+global uint32_t            ClockMap[17]     = { 0 };
+global uint32_t            add_usados = 0, mul_usados = 0, int_usados = 0;
+global int                 PC = 100;
+global CPU_Specs           _cpu_specs;
+global Banco_Registradores banco_registradores = { 0 };
 
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
 internal void emitir(void);
 internal void checar_waw(void);
-internal void leitura_operandos(uint32_t instrucao);
+internal void leitura_operandos(void);
 internal void checar_raw(void);
 internal void executar(void);
 internal void escrever(void);
@@ -77,41 +78,40 @@ rodar_programa(char *nome_saida, CPU_Specs *cpu_specs) {
     uint32_t instrucao = barramento_buscar_instrucao(PC); // Busca inicial
     adicionar_instrucao(instrucao);                       // Parte da busca
     emitir();                                             // Emissão
-    leitura_operandos(instrucao); // Leitura dos operandos
-    executar();                   // Execução
-    escrever();                   // Escrita
-    PC        += 4;               // Incrementa o PC
+    leitura_operandos(); // Leitura dos operandos
+    executar();          // Execução
+    escrever();          // Escrita
+    PC        += 4;      // Incrementa o PC
     instrucao  = barramento_buscar_instrucao(PC);
   }
 }
 
 internal void
-leitura_operandos(uint32_t instrucao) {
-  uint8_t  opcode = instrucao >> 26;
-  uint8_t  rd = 0, rs = 0, rt = 0;
-  uint16_t imm = 0, extra = 0;
-  uint32_t end = 0;
+leitura_operandos(void) {
+  Instrucao_No *instrucao = lista_leitura.cabeca;
 
-  switch (OpCodeTipo[opcode]) {
-  case R:
-    rd    = (instrucao >> 11) & 0x1F;
-    rs    = (instrucao >> 21) & 0x1F;
-    rt    = (instrucao >> 16) & 0x1F;
-    extra = instrucao & 0x7FF;
-    break;
-  case I:
-    rt  = (instrucao >> 16) & 0x1F;
-    rs  = (instrucao >> 21) & 0x1F;
-    imm = instrucao & 0xFFFF;
-    break;
-  case J: end = instrucao & 0x3FFFFFF; break;
-  default: perror("Tipo de instrução não reconhecido"); exit(EXIT_FAILURE);
+  while (instrucao) {
+    uint8_t  opcode = instrucao->instrucao >> 26;
+    uint8_t  rd = 0, rs = 0, rt = 0;
+    uint16_t imm = 0, extra = 0;
+    uint32_t end = 0;
+
+    switch (OpCodeTipo[opcode]) {
+    case R:
+      rd    = (instrucao->instrucao >> 11) & 0x1F;
+      rs    = (instrucao->instrucao >> 21) & 0x1F;
+      rt    = (instrucao->instrucao >> 16) & 0x1F;
+      extra = instrucao->instrucao & 0x7FF;
+      break;
+    case I:
+      rt  = (instrucao->instrucao >> 16) & 0x1F;
+      rs  = (instrucao->instrucao >> 21) & 0x1F;
+      imm = instrucao->instrucao & 0xFFFF;
+      break;
+    case J: end = instrucao->instrucao & 0x3FFFFFF; break;
+    default: perror("Tipo de instrução não reconhecido"); exit(EXIT_FAILURE);
+    }
   }
-
-  printf(
-      "Opcode: %u\nRD: %u\nRS: %u\nRT: %u\nIMM: %u\nEXTRA: %u\n"
-      "Endereço: %u\n",
-      opcode, rd, rs, rt, imm, extra, end);
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -144,39 +144,6 @@ printar_scoreboard(void) {
 
 internal void
 emitir(void) {
-  Instrucao_No *instrucao_emitida = lista_emissao.cabeca;
-  uint8_t       opcode            = instrucao_emitida->instrucao >> 26;
-
-  // Checa se UF disponível
-  if (opcode < 4) {
-    if (add_usados < _cpu_specs.uf_add) {
-      add_usados++;
-    } else {
-      return;
-    }
-  } else if (opcode < 6) {
-    if (mul_usados < _cpu_specs.uf_mul) {
-      mul_usados++;
-    } else {
-      return;
-    }
-  } else {
-    if (int_usados < _cpu_specs.uf_int) {
-      int_usados++;
-    } else {
-      return;
-    }
-  }
-
-  // Tá certo confia
-  checar_waw();
-}
-
-internal void
-escrever(void) {}
-
-internal void
-checar_waw(void) {
   Instrucao_No *instrucao_emitida    = lista_emissao.cabeca;
   Instrucao_No *instrucao_executando = lista_executando.cabeca;
 
@@ -203,6 +170,18 @@ checar_waw(void) {
   }
 
   while (instrucao_emitida) {
+    uint8_t opcode = instrucao_emitida->instrucao >> 26;
+
+    // Checa se UF disponível
+    // Tá feio mas acho que tá certo
+    if (opcode < 4 && add_usados < _cpu_specs.uf_add) {
+    } else if (opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
+    } else if (opcode < 16 && int_usados < _cpu_specs.uf_int) {
+    } else {
+      continue;
+    }
+
+    // Checando WAW
     switch (instrucao_emitida->tipo) {
     case R:
       if (!registradores_usados[(instrucao_emitida->instrucao >> 11) & 0x1F]) {
@@ -228,6 +207,9 @@ checar_waw(void) {
     instrucao_emitida = instrucao_emitida->proximo;
   }
 }
+
+internal void
+escrever(void) {}
 
 internal void
 executar(void) {}

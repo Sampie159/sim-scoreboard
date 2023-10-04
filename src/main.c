@@ -42,10 +42,7 @@ main(int argc, char *argv[]) {
   buffer[tamanho] = '\0';
   fclose(arq);
 
-  printf("%s\n", buffer);
-
   leitor_ler_arquivo(buffer, memoria, &cpu_specs);
-  printf("%d\n", *((int *) &memoria[00]));
 
   scoreboard_inicializar(&cpu_specs);
   barramento_inicializar(memoria);

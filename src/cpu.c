@@ -106,21 +106,21 @@ leitura_operandos(void) {
 
   Banco_Registradores registradores_usados = { 0 };
 
-  while (add) {
+  for (uint i = 0; i < _cpu_specs.uf_add; i++) {
     if (add->Fi > -1) {
       registradores_usados[add->Fi] = 1;
     }
     add++;
   }
 
-  while (mul) {
+  for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
     if (mul->Fi > -1) {
       registradores_usados[mul->Fi] = 1;
     }
     mul++;
   }
 
-  while (inteiro) {
+  for (uint i = 0; i < _cpu_specs.uf_int; i++) {
     if (inteiro->Fi > -1) {
       registradores_usados[inteiro->Fi] = 1;
     }
@@ -129,7 +129,7 @@ leitura_operandos(void) {
 
   // Checar RAW
   Instrucao_No *instrucao = lista_leitura.cabeca;
-  while (instrucao) {
+  while (instrucao != NULL) {
     uint8_t opcode = instrucao->instrucao >> 26;
     int8_t  rd = -1, rs = -1, rt = -1;
     int16_t imm = -1, extra = -1;
@@ -258,7 +258,7 @@ emitir(void) {
 
   Banco_Registradores registradores_usados = { 0 };
 
-  while (instrucao_executando) {
+  while (instrucao_executando != NULL) {
     switch (instrucao_executando->tipo) {
     case R:
       registradores_usados[(instrucao_executando->instrucao >> 11) & 0x1F] = 1;
@@ -278,7 +278,7 @@ emitir(void) {
     instrucao_executando = instrucao_executando->proximo;
   }
 
-  while (instrucao_emitida) {
+  while (instrucao_emitida != NULL) {
     uint8_t opcode = instrucao_emitida->instrucao >> 26;
 
     // Checa se UF disponível
@@ -328,7 +328,7 @@ escrever(void) {
 
   Banco_Registradores registradores_usados = { 0 };
 
-  while (add) {
+  for (uint i = 0; i < _cpu_specs.uf_add; i++) {
     if (add->Qj) {
       registradores_usados[add->Qj] = 1;
     }
@@ -339,7 +339,7 @@ escrever(void) {
     add++;
   }
 
-  while (mul) {
+  for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
     if (mul->Qj) {
       registradores_usados[mul->Qj] = 1;
     }
@@ -350,7 +350,7 @@ escrever(void) {
     mul++;
   }
 
-  while (inteiro) {
+  for (uint i = 0; i < _cpu_specs.uf_int; i++) {
     if (inteiro->Qj) {
       registradores_usados[inteiro->Qj] = 1;
     }
@@ -361,7 +361,7 @@ escrever(void) {
     inteiro++;
   }
 
-  while (instrucao) {
+  while (instrucao != NULL) {
     uint8_t opcode = instrucao->instrucao >> 26;
     if (opcode < 4) {
       add = banco_uf.add;
@@ -418,7 +418,7 @@ internal void
 executar(void) {
   Instrucao_No *instrucao = lista_executando.cabeca;
 
-  while (instrucao) {
+  while (instrucao != NULL) {
     if (instrucao->clocks_restantes > 0) {
       instrucao->clocks_restantes--;
     } else {
@@ -436,7 +436,7 @@ internal void
 mandar_ler(Instrucao_No *instrucao) {
   Instrucao_No *emitida = lista_emissao.cabeca;
 
-  while (emitida->proximo != instrucao) {
+  while (emitida && emitida->proximo != instrucao) {
     emitida = emitida->proximo;
   }
 

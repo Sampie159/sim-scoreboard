@@ -11,7 +11,7 @@ typedef struct _banco_uf  Banco_UF;
 struct _uf {
   uint8_t     operacao; // OpCode
   Registrador Fi;       // Destino
-  uint32_t    Fj, Fk;   // Valores
+  Registrador Fj, Fk;   // Valores
   int         Qj, Qk;   // Unidades produtoras
   int         Rj, Rk;   // Flags de disponibilidade
   int         busy;     // Flag de ocupação

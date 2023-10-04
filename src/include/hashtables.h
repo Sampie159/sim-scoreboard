@@ -373,3 +373,5 @@ compare : {
 static tipo OpCodeTipo[] = {
   R, I, R, I, R, R, R, R, R, I, I, I, I, J, I, I, J
 };
+
+static char *Tipo_UF_Nome[] = { "Add", "Mul", "Int" };

@@ -9,8 +9,11 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct _lista_instrucoes Lista_Instrucoes;
-typedef struct _instrucao_no     Instrucao_No;
+typedef struct _lista_instrucoes   Lista_Instrucoes;
+typedef struct _instrucao_no       Instrucao_No;
+typedef struct _status_registrador Status_Registrador;
+
+typedef enum _tipo_uf { add, mul, inteiro } Tipo_UF;
 
 struct _instrucao_no {
   uint32_t      instrucao;
@@ -25,17 +28,23 @@ struct _lista_instrucoes {
   Instrucao_No *fim;
 };
 
+struct _status_registrador {
+  Tipo_UF uf;
+  int     pos;
+};
+
 global Lista_Instrucoes    lista_emissao    = { 0 };
 global Lista_Instrucoes    lista_leitura    = { 0 };
 global Lista_Instrucoes    lista_executando = { 0 };
 global Lista_Instrucoes    lista_escrita    = { 0 };
 global uint32_t            ClockMap[17]     = { 0 };
 global uint32_t            add_usados = 0, mul_usados = 0, int_usados = 0;
-global int                 PC                  = 100;
-global CPU_Specs           _cpu_specs          = { 0 };
-global Banco_Registradores banco_registradores = { 0 };
-global Banco_UF            banco_uf            = { 0 };
-global int                 rodando             = 1;
+global int                 PC                     = 100;
+global CPU_Specs           _cpu_specs             = { 0 };
+global Banco_Registradores banco_registradores    = { 0 };
+global Banco_UF            banco_uf               = { 0 };
+global int                 rodando                = 1;
+global Status_Registrador  status_registrador[32] = { 0 };
 
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
@@ -46,6 +55,8 @@ internal void escrever(void);
 internal void mandar_ler(Instrucao_No *instrucao);
 internal void mandar_executar(Instrucao_No *instrucao);
 internal void mandar_escrever(Instrucao_No *instrucao);
+internal void printar_ufs(void);
+internal void printar_status_registradores(void);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -87,10 +98,13 @@ rodar_programa(char *nome_saida) {
     executar();                                  // Execução
     leitura_operandos();                         // Leitura dos operandos
                                                  // Busca e emite no mesmo clock
-    adicionar_instrucao(instrucao);              // Parte da busca
+    if (instrucao) {
+      adicionar_instrucao(instrucao);            // Parte da busca
+    }
     emitir();                                    // Emissão
     // TODO: Mudar local do PC
     PC += 4; // Incrementa o PC
+    printar_scoreboard();
   }
 }
 
@@ -243,13 +257,52 @@ adicionar_instrucao(uint32_t instrucao) {
     lista_emissao.fim->proximo = no;
     lista_emissao.fim          = no;
   }
-
-  printf("Instrução adicionada: %u\n", instrucao);
 }
 
 internal void
 printar_scoreboard(void) {
-  printf("Scoreboard:\n");
+  local_persist uint32_t clock = 0;
+
+  Instrucao_No *instrucao_emitida = lista_emissao.cabeca;
+  Instrucao_No *instrucao_leitura = lista_leitura.cabeca;
+  Instrucao_No *instrucao_executa = lista_executando.cabeca;
+  Instrucao_No *instrucao_escrita = lista_escrita.cabeca;
+
+  printf("Clock: %u\n", clock);
+
+  // Estado das instruções
+  while (instrucao_emitida != NULL) {
+    printf("Emitida: %u\n", instrucao_emitida->instrucao);
+    instrucao_emitida = instrucao_emitida->proximo;
+  }
+
+  while (instrucao_leitura != NULL) {
+    printf("Leitura: %u\n", instrucao_leitura->instrucao);
+    instrucao_leitura = instrucao_leitura->proximo;
+  }
+
+  while (instrucao_executa != NULL) {
+    printf("Executa: %u\n", instrucao_executa->instrucao);
+    instrucao_executa = instrucao_executa->proximo;
+  }
+
+  while (instrucao_escrita != NULL) {
+    printf("Escrita: %u\n", instrucao_escrita->instrucao);
+    instrucao_escrita = instrucao_escrita->proximo;
+  }
+
+  // Estado das UFs
+  UF *add     = banco_uf.add;
+  UF *mul     = banco_uf.mul;
+  UF *inteiro = banco_uf.inteiro;
+
+  printf("UFs:\n");
+  printar_ufs();
+
+  // Estado dos registradores
+  printar_status_registradores();
+
+  clock++;
 }
 
 internal void
@@ -534,5 +587,61 @@ mandar_escrever(Instrucao_No *instrucao) {
         lista_escrita.fim          = instrucao;
       }
     }
+  }
+}
+
+internal void
+printar_ufs(void) {
+  UF *add     = banco_uf.add;
+  UF *mul     = banco_uf.mul;
+  UF *inteiro = banco_uf.inteiro;
+
+  printf("\nName\tBusy\tOperation\tFi\tFj\tFk\tQj\tQk\tRj\tRk\n");
+
+  printf(
+      "------------------------------------------------------------------------"
+      "-----------------\n");
+
+  for (uint i = 0; i < _cpu_specs.uf_add; i++) {
+    printf("ADD %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, add->busy,
+           add->operacao, add->Fi, add->Fj, add->Fk, add->Qj, add->Qk, add->Rj,
+           add->Rk);
+    add++;
+  }
+
+  printf(
+      "------------------------------------------------------------------------"
+      "-----------------\n");
+
+  for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
+    printf("MUL %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, mul->busy,
+           mul->operacao, mul->Fi, mul->Fj, mul->Fk, mul->Qj, mul->Qk, mul->Rj,
+           mul->Rk);
+    mul++;
+  }
+
+  printf(
+      "------------------------------------------------------------------------"
+      "-----------------\n");
+
+  for (uint i = 0; i < _cpu_specs.uf_int; i++) {
+    printf("INT %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, inteiro->busy,
+           inteiro->operacao, inteiro->Fi, inteiro->Fj, inteiro->Fk,
+           inteiro->Qj, inteiro->Qk, inteiro->Rj, inteiro->Rk);
+    inteiro++;
+  }
+
+  printf(
+      "------------------------------------------------------------------------"
+      "-----------------\n");
+}
+
+internal void
+printar_status_registradores(void) {
+  printf("\nRegistradores:\n\n");
+
+  for (uint i = 0; i < 32; i++) {
+    char *uf = Tipo_UF_Nome[status_registrador[i].uf];
+    printf("R%u:\t%s\t%u\n", i, uf, status_registrador[i].pos);
   }
 }

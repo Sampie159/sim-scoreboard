@@ -12,6 +12,7 @@
 typedef struct _lista_instrucoes   Lista_Instrucoes;
 typedef struct _instrucao_no       Instrucao_No;
 typedef struct _status_registrador Status_Registrador;
+typedef struct _status_instrucoes  Status_Instrucoes;
 
 typedef enum _tipo_uf { add, mul, inteiro } Tipo_UF;
 
@@ -33,6 +34,15 @@ struct _status_registrador {
   int     pos;
 };
 
+struct _status_instrucoes {
+  char *instrucao;
+  char  busca;
+  char  emissao;
+  char  leitura;
+  char  execucao;
+  char  escrita;
+};
+
 global Lista_Instrucoes    lista_emissao    = { 0 };
 global Lista_Instrucoes    lista_leitura    = { 0 };
 global Lista_Instrucoes    lista_executando = { 0 };
@@ -45,6 +55,7 @@ global Banco_Registradores banco_registradores    = { 0 };
 global Banco_UF            banco_uf               = { 0 };
 global int                 rodando                = 1;
 global Status_Registrador  status_registrador[32] = { 0 };
+global Status_Instrucoes  *status_instrucoes      = NULL;
 
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
@@ -57,6 +68,7 @@ internal void mandar_executar(Instrucao_No *instrucao);
 internal void mandar_escrever(Instrucao_No *instrucao);
 internal void printar_ufs(void);
 internal void printar_status_registradores(void);
+internal void printar_instrucoes(void);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -86,6 +98,9 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
   banco_uf.add     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_add);
   banco_uf.mul     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_mul);
   banco_uf.inteiro = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_int);
+
+  status_instrucoes = (Status_Instrucoes *) malloc(sizeof(Status_Instrucoes)
+                                                   * _cpu_specs.qtd_instrucoes);
 }
 
 void
@@ -271,36 +286,21 @@ printar_scoreboard(void) {
   printf("Clock: %u\n", clock);
 
   // Estado das instruções
-  while (instrucao_emitida != NULL) {
-    printf("Emitida: %u\n", instrucao_emitida->instrucao);
-    instrucao_emitida = instrucao_emitida->proximo;
-  }
-
-  while (instrucao_leitura != NULL) {
-    printf("Leitura: %u\n", instrucao_leitura->instrucao);
-    instrucao_leitura = instrucao_leitura->proximo;
-  }
-
-  while (instrucao_executa != NULL) {
-    printf("Executa: %u\n", instrucao_executa->instrucao);
-    instrucao_executa = instrucao_executa->proximo;
-  }
-
-  while (instrucao_escrita != NULL) {
-    printf("Escrita: %u\n", instrucao_escrita->instrucao);
-    instrucao_escrita = instrucao_escrita->proximo;
-  }
+  printar_instrucoes();
 
   // Estado das UFs
   UF *add     = banco_uf.add;
   UF *mul     = banco_uf.mul;
   UF *inteiro = banco_uf.inteiro;
 
-  printf("UFs:\n");
   printar_ufs();
 
   // Estado dos registradores
   printar_status_registradores();
+
+  printf(
+      "---------------------------------------------------------------------"
+      "-----------------\n");
 
   clock++;
 }
@@ -603,7 +603,7 @@ printar_ufs(void) {
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_add; i++) {
-    printf("ADD %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, add->busy,
+    printf("ADD %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, add->busy,
            add->operacao, add->Fi, add->Fj, add->Fk, add->Qj, add->Qk, add->Rj,
            add->Rk);
     add++;
@@ -614,7 +614,7 @@ printar_ufs(void) {
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
-    printf("MUL %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, mul->busy,
+    printf("MUL %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, mul->busy,
            mul->operacao, mul->Fi, mul->Fj, mul->Fk, mul->Qj, mul->Qk, mul->Rj,
            mul->Rk);
     mul++;
@@ -625,7 +625,7 @@ printar_ufs(void) {
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_int; i++) {
-    printf("INT %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d\n", i, inteiro->busy,
+    printf("INT %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, inteiro->busy,
            inteiro->operacao, inteiro->Fi, inteiro->Fj, inteiro->Fk,
            inteiro->Qj, inteiro->Qk, inteiro->Rj, inteiro->Rk);
     inteiro++;
@@ -643,5 +643,19 @@ printar_status_registradores(void) {
   for (uint i = 0; i < 32; i++) {
     char *uf = Tipo_UF_Nome[status_registrador[i].uf];
     printf("R%u:\t%s\t%u\n", i, uf, status_registrador[i].pos);
+  }
+}
+
+internal void
+printar_instrucoes(void) {
+  printf("\nInstruções:\n\n");
+  Status_Instrucoes *instrucao = status_instrucoes;
+
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    printf("%s\t%s\t%s\t%s\t%s\t%s\n", instrucao->instrucao,
+           instrucao->busca ? "X" : "-", instrucao->emissao ? "X" : "-",
+           instrucao->leitura ? "X" : "-", instrucao->execucao ? "X" : "-",
+           instrucao->escrita ? "X" : "-");
+    instrucao++;
   }
 }

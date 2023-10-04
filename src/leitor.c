@@ -17,7 +17,8 @@ internal void  ler_specs(Leitor *l, CPU_Specs *cpu_specs);
 internal char *ler_identificador(Leitor *l);
 internal void  ignorar_comentario(Leitor *l);
 internal void  ler_dados(Leitor *l, char *memoria, uint32_t *idx);
-internal void  ler_texto(Leitor *l, char *memoria, uint32_t *idx);
+internal void  ler_texto(Leitor *l, char *memoria, uint32_t *idx,
+                         CPU_Specs *cpu_specs);
 internal void  ler_campos_r(Leitor *l, char *memoria, uint32_t *idx,
                             const uint8_t opcode);
 internal void  ler_campos_i_1(Leitor *l, char *memoria, uint32_t *idx);
@@ -66,7 +67,7 @@ leitor_ler_arquivo(char *input, char *memoria, CPU_Specs *cpu_specs) {
         if (strncmp(identificador, "data", 4) == 0) {
           ler_dados(&l, memoria, &idx);
         } else if (strncmp(identificador, "text", 4) == 0) {
-          ler_texto(&l, memoria, &idx);
+          ler_texto(&l, memoria, &idx, cpu_specs);
         } else {
           perror("Erro de sintaxe 2");
           exit(EXIT_FAILURE);
@@ -149,10 +150,11 @@ ler_dados(Leitor *l, char *memoria, uint32_t *idx) {
 }
 
 internal void
-ler_texto(Leitor *l, char *memoria, uint32_t *idx) {
+ler_texto(Leitor *l, char *memoria, uint32_t *idx, CPU_Specs *cpu_specs) {
   struct OpCodeMap op_code_map = { 0 };
 
   *idx = 100; // Primeiros 100 bits são reservados para os dados.
+  uint32_t instrucoes = 0;
 
   while (l->ch != '\0') {
     ignorar_espacos(l);
@@ -192,10 +194,13 @@ ler_texto(Leitor *l, char *memoria, uint32_t *idx) {
         break;
       }
       (*idx) += 4;
+      instrucoes++;
     } else if (l->ch == '#') {
       ignorar_comentario(l);
     }
   }
+
+  cpu_specs->qtd_instrucoes = instrucoes;
 }
 
 internal void

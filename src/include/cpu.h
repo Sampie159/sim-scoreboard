@@ -45,6 +45,8 @@ struct _cpu_specs {
   uint32_t clock_load;
   uint32_t clock_store;
   uint32_t clock_exit;
+
+  uint32_t qtd_instrucoes;
 };
 
 void scoreboard_inicializar(CPU_Specs *cpu_specs);

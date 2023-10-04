@@ -35,6 +35,7 @@ global int                 PC                  = 100;
 global CPU_Specs           _cpu_specs          = { 0 };
 global Banco_Registradores banco_registradores = { 0 };
 global Banco_UF            banco_uf            = { 0 };
+global int                 rodando             = 1;
 
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
@@ -78,18 +79,18 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
 
 void
 rodar_programa(char *nome_saida) {
-  int rodando = 1;
-  while (rodando) {                                       // 0x10 = EXIT
-    uint32_t instrucao = barramento_buscar_instrucao(PC); // Busca inicial
-    escrever();                                           // Escrita
-    executar();                                           // Execução
-    leitura_operandos();            // Leitura dos operandos
-                                    // Busca e emite no mesmo clock
-    adicionar_instrucao(instrucao); // Parte da busca
-    emitir();                       // Emissão
+  uint32_t instrucao;
+
+  while (rodando) {                              // 0x10 = EXIT
+    instrucao = barramento_buscar_instrucao(PC); // Busca inicial
+    escrever();                                  // Escrita
+    executar();                                  // Execução
+    leitura_operandos();                         // Leitura dos operandos
+                                                 // Busca e emite no mesmo clock
+    adicionar_instrucao(instrucao);              // Parte da busca
+    emitir();                                    // Emissão
     // TODO: Mudar local do PC
-    PC        += 4; // Incrementa o PC
-    instrucao  = barramento_buscar_instrucao(PC);
+    PC += 4; // Incrementa o PC
   }
 }
 
@@ -393,7 +394,7 @@ escrever(void) {
       mul_usados--;
 
       barramento_escrever_dado(0, banco_registradores[mul->Fi]);
-    } else {
+    } else if (opcode < 16) {
       inteiro = banco_uf.inteiro;
       for (int i = 0; i < instrucao->uf; i++) {
         inteiro++;
@@ -408,6 +409,8 @@ escrever(void) {
       int_usados--;
 
       barramento_escrever_dado(0, banco_registradores[inteiro->Fi]);
+    } else {
+      rodando = 0;
     }
 
     instrucao = instrucao->proximo;
@@ -436,18 +439,33 @@ internal void
 mandar_ler(Instrucao_No *instrucao) {
   Instrucao_No *emitida = lista_emissao.cabeca;
 
-  while (emitida && emitida->proximo != instrucao) {
-    emitida = emitida->proximo;
-  }
+  if (emitida == instrucao) {
+    lista_emissao.cabeca = NULL;
+    lista_emissao.fim    = NULL;
 
-  emitida->proximo = instrucao->proximo;
-
-  if (lista_leitura.cabeca == NULL) {
-    lista_leitura.cabeca = instrucao;
-    lista_leitura.fim    = instrucao;
+    if (lista_leitura.cabeca == NULL) {
+      lista_leitura.cabeca = instrucao;
+      lista_leitura.fim    = instrucao;
+    } else {
+      lista_leitura.fim->proximo = instrucao;
+      lista_leitura.fim          = instrucao;
+    }
   } else {
-    lista_leitura.fim->proximo = instrucao;
-    lista_leitura.fim          = instrucao;
+    while (emitida && emitida->proximo != instrucao) {
+      emitida = emitida->proximo;
+    }
+
+    if (emitida) {
+      emitida->proximo = instrucao->proximo;
+
+      if (lista_leitura.cabeca == NULL) {
+        lista_leitura.cabeca = instrucao;
+        lista_leitura.fim    = instrucao;
+      } else {
+        lista_leitura.fim->proximo = instrucao;
+        lista_leitura.fim          = instrucao;
+      }
+    }
   }
 }
 
@@ -455,18 +473,33 @@ internal void
 mandar_executar(Instrucao_No *instrucao) {
   Instrucao_No *leitura = lista_leitura.cabeca;
 
-  while (leitura->proximo != instrucao) {
-    leitura = leitura->proximo;
-  }
+  if (leitura == instrucao) {
+    lista_leitura.cabeca = NULL;
+    lista_leitura.fim    = NULL;
 
-  leitura->proximo = instrucao->proximo;
-
-  if (lista_executando.cabeca == NULL) {
-    lista_executando.cabeca = instrucao;
-    lista_executando.fim    = instrucao;
+    if (lista_executando.cabeca == NULL) {
+      lista_executando.cabeca = instrucao;
+      lista_executando.fim    = instrucao;
+    } else {
+      lista_executando.fim->proximo = instrucao;
+      lista_executando.fim          = instrucao;
+    }
   } else {
-    lista_executando.fim->proximo = instrucao;
-    lista_executando.fim          = instrucao;
+    while (leitura && leitura->proximo != instrucao) {
+      leitura = leitura->proximo;
+    }
+
+    if (leitura) {
+      leitura->proximo = instrucao->proximo;
+
+      if (lista_executando.cabeca == NULL) {
+        lista_executando.cabeca = instrucao;
+        lista_executando.fim    = instrucao;
+      } else {
+        lista_executando.fim->proximo = instrucao;
+        lista_executando.fim          = instrucao;
+      }
+    }
   }
 }
 
@@ -474,17 +507,32 @@ internal void
 mandar_escrever(Instrucao_No *instrucao) {
   Instrucao_No *executando = lista_executando.cabeca;
 
-  while (executando->proximo != instrucao) {
-    executando = executando->proximo;
-  }
+  if (executando == instrucao) {
+    lista_executando.cabeca = NULL;
+    lista_executando.fim    = NULL;
 
-  executando->proximo = instrucao->proximo;
-
-  if (lista_escrita.cabeca == NULL) {
-    lista_escrita.cabeca = instrucao;
-    lista_escrita.fim    = instrucao;
+    if (lista_escrita.cabeca == NULL) {
+      lista_escrita.cabeca = instrucao;
+      lista_escrita.fim    = instrucao;
+    } else {
+      lista_escrita.fim->proximo = instrucao;
+      lista_escrita.fim          = instrucao;
+    }
   } else {
-    lista_escrita.fim->proximo = instrucao;
-    lista_escrita.fim          = instrucao;
+    while (executando && executando->proximo != instrucao) {
+      executando = executando->proximo;
+    }
+
+    if (executando) {
+      executando->proximo = instrucao->proximo;
+
+      if (lista_escrita.cabeca == NULL) {
+        lista_escrita.cabeca = instrucao;
+        lista_escrita.fim    = instrucao;
+      } else {
+        lista_escrita.fim->proximo = instrucao;
+        lista_escrita.fim          = instrucao;
+      }
+    }
   }
 }

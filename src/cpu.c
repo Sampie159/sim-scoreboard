@@ -30,9 +30,10 @@ global Lista_Instrucoes    lista_executando = { 0 };
 global Lista_Instrucoes    lista_escrita    = { 0 };
 global uint32_t            ClockMap[17]     = { 0 };
 global uint32_t            add_usados = 0, mul_usados = 0, int_usados = 0;
-global int                 PC = 100;
-global CPU_Specs           _cpu_specs;
+global int                 PC                  = 100;
+global CPU_Specs           _cpu_specs          = { 0 };
 global Banco_Registradores banco_registradores = { 0 };
+global Banco_UF            banco_uf            = { 0 };
 
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
@@ -44,6 +45,7 @@ internal void executar(void);
 internal void escrever(void);
 internal void checar_war(void);
 internal void mandar_ler(Instrucao_No *instrucao);
+internal void mandar_executar(Instrucao_No *instrucao);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -69,32 +71,70 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
   ClockMap[14] = _cpu_specs.clock_load;
   ClockMap[15] = _cpu_specs.clock_store;
   ClockMap[16] = _cpu_specs.clock_exit;
+
+  banco_uf.add     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_add);
+  banco_uf.mul     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_mul);
+  banco_uf.inteiro = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_int);
 }
 
 void
-rodar_programa(char *nome_saida, CPU_Specs *cpu_specs) {
+rodar_programa(char *nome_saida) {
   int rodando = 1;
   while (rodando) {                                       // 0x10 = EXIT
     uint32_t instrucao = barramento_buscar_instrucao(PC); // Busca inicial
-    adicionar_instrucao(instrucao);                       // Parte da busca
-    emitir();                                             // Emissão
-    leitura_operandos(); // Leitura dos operandos
-    executar();          // Execução
-    escrever();          // Escrita
-    PC        += 4;      // Incrementa o PC
+    escrever();                                           // Escrita
+    executar();                                           // Execução
+    leitura_operandos();            // Leitura dos operandos
+                                    // Busca e emite no mesmo clock
+    adicionar_instrucao(instrucao); // Parte da busca
+    emitir();                       // Emissão
+    // TODO: Mudar local do PC
+    PC        += 4; // Incrementa o PC
     instrucao  = barramento_buscar_instrucao(PC);
   }
 }
 
+/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
+ *                          PRIVATE FUNCTIONS                              *
+ * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
+
 internal void
 leitura_operandos(void) {
-  Instrucao_No *instrucao = lista_leitura.cabeca;
+  // Encontra a instrução que está sendo executada
+  UF *add     = banco_uf.add;
+  UF *mul     = banco_uf.mul;
+  UF *inteiro = banco_uf.inteiro;
 
+  Banco_Registradores registradores_usados = { 0 };
+
+  while (add) {
+    if (add->Fi > -1) {
+      registradores_usados[add->Fi] = 1;
+    }
+    add++;
+  }
+
+  while (mul) {
+    if (mul->Fi > -1) {
+      registradores_usados[mul->Fi] = 1;
+    }
+    mul++;
+  }
+
+  while (inteiro) {
+    if (inteiro->Fi > -1) {
+      registradores_usados[inteiro->Fi] = 1;
+    }
+    inteiro++;
+  }
+
+  // Checar RAW
+  Instrucao_No *instrucao = lista_leitura.cabeca;
   while (instrucao) {
-    uint8_t  opcode = instrucao->instrucao >> 26;
-    uint8_t  rd = 0, rs = 0, rt = 0;
-    uint16_t imm = 0, extra = 0;
-    uint32_t end = 0;
+    uint8_t opcode = instrucao->instrucao >> 26;
+    int8_t  rd = -1, rs = -1, rt = -1;
+    int16_t imm = -1, extra = -1;
+    int32_t end = -1;
 
     switch (OpCodeTipo[opcode]) {
     case R:
@@ -111,12 +151,46 @@ leitura_operandos(void) {
     case J: end = instrucao->instrucao & 0x3FFFFFF; break;
     default: perror("Tipo de instrução não reconhecido"); exit(EXIT_FAILURE);
     }
+
+    if (banco_registradores[rs]) {
+      instrucao = instrucao->proximo;
+      continue;
+    }
+
+    if (opcode != 0xD && banco_registradores[rt]) {
+      instrucao = instrucao->proximo;
+      continue;
+    }
+
+    // Não tem RAW
+    mandar_executar(instrucao);
+
+    if (opcode == 0 || opcode == 2) {
+      add_usados++;
+      add = banco_uf.add;
+      while (add) {
+        if (add->busy == 0) {
+          add->busy     = 1;
+          add->operacao = opcode;
+          add->Fi       = rd;
+          add->Fj       = -1;
+          add->Fk       = -1;
+          add->Qj       = NULL;
+          add->Qk       = NULL;
+          add->Rj       = 1;
+          add->Rk       = 1;
+          break;
+        }
+      }
+    }
+
+    // banco_registradores[rd] = 1;
+    // banco_registradores[rs] = 1;
+    // banco_registradores[rt] = 1;
+
+    instrucao = instrucao->proximo;
   }
 }
-
-/* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
- *                          PRIVATE FUNCTIONS                              *
- * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
 internal void
 adicionar_instrucao(uint32_t instrucao) {
@@ -147,7 +221,7 @@ emitir(void) {
   Instrucao_No *instrucao_emitida    = lista_emissao.cabeca;
   Instrucao_No *instrucao_executando = lista_executando.cabeca;
 
-  int registradores_usados[32] = { 0 };
+  Banco_Registradores registradores_usados = { 0 };
 
   while (instrucao_executando) {
     switch (instrucao_executando->tipo) {
@@ -178,6 +252,7 @@ emitir(void) {
     } else if (opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
     } else if (opcode < 16 && int_usados < _cpu_specs.uf_int) {
     } else {
+      instrucao_emitida = instrucao_emitida->proximo;
       continue;
     }
 
@@ -230,5 +305,24 @@ mandar_ler(Instrucao_No *instrucao) {
   } else {
     lista_leitura.fim->proximo = instrucao;
     lista_leitura.fim          = instrucao;
+  }
+}
+
+internal void
+mandar_executar(Instrucao_No *instrucao) {
+  Instrucao_No *leitura = lista_leitura.cabeca;
+
+  while (leitura->proximo != instrucao) {
+    leitura = leitura->proximo;
+  }
+
+  leitura->proximo = instrucao->proximo;
+
+  if (lista_executando.cabeca == NULL) {
+    lista_executando.cabeca = instrucao;
+    lista_executando.fim    = instrucao;
+  } else {
+    lista_executando.fim->proximo = instrucao;
+    lista_executando.fim          = instrucao;
   }
 }

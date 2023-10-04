@@ -2,10 +2,26 @@
 
 #include <stdint.h>
 
-typedef unsigned int                Registrador;
-typedef struct _cpu_specs           CPU_Specs;
-typedef struct _scoreboard          Scoreboard;
-typedef struct _banco_registradores Banco_Registradores;
+typedef int               Registrador;
+typedef struct _cpu_specs CPU_Specs;
+typedef Registrador       Banco_Registradores[32];
+typedef struct _uf        UF;
+typedef struct _banco_uf  Banco_UF;
+
+struct _uf {
+  uint8_t     operacao; // OpCode
+  Registrador Fi;       // Destino
+  uint32_t    Fj, Fk;   // Valores
+  UF         *Qj, *Qk;  // Unidades produtoras
+  int         Rj, Rk;   // Flags de disponibilidade
+  int         busy;     // Flag de ocupação
+};
+
+struct _banco_uf {
+  UF *add;
+  UF *mul;
+  UF *inteiro;
+};
 
 struct _cpu_specs {
   uint32_t uf_add;
@@ -31,44 +47,5 @@ struct _cpu_specs {
   uint32_t clock_exit;
 };
 
-struct _banco_registradores {
-  Registrador r0;
-  Registrador r1;
-  Registrador r2;
-  Registrador r3;
-  Registrador r4;
-  Registrador r5;
-  Registrador r6;
-  Registrador r7;
-  Registrador r8;
-  Registrador r9;
-  Registrador r10;
-  Registrador r11;
-  Registrador r12;
-  Registrador r13;
-  Registrador r14;
-  Registrador r15;
-  Registrador r16;
-  Registrador r17;
-  Registrador r18;
-  Registrador r19;
-  Registrador r20;
-  Registrador r21;
-  Registrador r22;
-  Registrador r23;
-  Registrador r24;
-  Registrador r25;
-  Registrador r26;
-  Registrador r27;
-  Registrador r28;
-  Registrador r29;
-  Registrador r30;
-  Registrador r31;
-};
-
-struct _scoreboard {
-  int a;
-};
-
 void scoreboard_inicializar(CPU_Specs *cpu_specs);
-void rodar_programa(char *nome_saida, CPU_Specs *cpu_specs);
+void rodar_programa(char *nome_saida);

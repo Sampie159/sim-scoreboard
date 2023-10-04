@@ -49,7 +49,7 @@ main(int argc, char *argv[]) {
 
   scoreboard_inicializar(&cpu_specs);
   barramento_inicializar(memoria);
-  rodar_programa(programa.nome_saida, &cpu_specs);
+  rodar_programa(programa.nome_saida);
 
   return 0;
 }

@@ -12,7 +12,7 @@ struct _uf {
   uint8_t     operacao; // OpCode
   Registrador Fi;       // Destino
   uint32_t    Fj, Fk;   // Valores
-  UF         *Qj, *Qk;  // Unidades produtoras
+  int         Qj, Qk;   // Unidades produtoras
   int         Rj, Rk;   // Flags de disponibilidade
   int         busy;     // Flag de ocupação
 };

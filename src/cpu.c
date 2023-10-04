@@ -16,6 +16,7 @@ struct _instrucao_no {
   uint32_t      instrucao;
   int           clocks_restantes;
   tipo          tipo;
+  int           uf;
   Instrucao_No *proximo;
 };
 
@@ -38,14 +39,12 @@ global Banco_UF            banco_uf            = { 0 };
 internal void adicionar_instrucao(uint32_t instrucao);
 internal void printar_scoreboard(void);
 internal void emitir(void);
-internal void checar_waw(void);
 internal void leitura_operandos(void);
-internal void checar_raw(void);
 internal void executar(void);
 internal void escrever(void);
-internal void checar_war(void);
 internal void mandar_ler(Instrucao_No *instrucao);
 internal void mandar_executar(Instrucao_No *instrucao);
+internal void mandar_escrever(Instrucao_No *instrucao);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -165,28 +164,64 @@ leitura_operandos(void) {
     // Não tem RAW
     mandar_executar(instrucao);
 
-    if (opcode == 0 || opcode == 2) {
+    if (opcode < 4) {
       add_usados++;
       add = banco_uf.add;
       while (add) {
-        if (add->busy == 0) {
+        if (!add->busy) {
           add->busy     = 1;
           add->operacao = opcode;
           add->Fi       = rd;
-          add->Fj       = -1;
-          add->Fk       = -1;
-          add->Qj       = NULL;
-          add->Qk       = NULL;
+          add->Fj       = 0;
+          add->Fk       = 0;
+          add->Qj       = 0;
+          add->Qk       = 0;
           add->Rj       = 1;
           add->Rk       = 1;
           break;
         }
+
+        add++;
+      }
+    } else if (opcode < 6) {
+      mul_usados++;
+      mul = banco_uf.mul;
+      while (mul) {
+        if (!mul->busy) {
+          mul->busy     = 1;
+          mul->operacao = opcode;
+          mul->Fi       = rd;
+          mul->Fj       = 0;
+          mul->Fk       = 0;
+          mul->Qj       = 0;
+          mul->Qk       = 0;
+          mul->Rj       = 1;
+          mul->Rk       = 1;
+          break;
+        }
+
+        mul++;
+      }
+    } else {
+      int_usados++;
+      inteiro = banco_uf.inteiro;
+      while (inteiro) {
+        if (!inteiro->busy) {
+          inteiro->busy     = 1;
+          inteiro->operacao = opcode;
+          inteiro->Fi       = rd;
+          inteiro->Fj       = 0;
+          inteiro->Fk       = 0;
+          inteiro->Qj       = 0;
+          inteiro->Qk       = 0;
+          inteiro->Rj       = 1;
+          inteiro->Rk       = 1;
+          break;
+        }
+
+        inteiro++;
       }
     }
-
-    // banco_registradores[rd] = 1;
-    // banco_registradores[rs] = 1;
-    // banco_registradores[rt] = 1;
 
     instrucao = instrucao->proximo;
   }
@@ -284,10 +319,118 @@ emitir(void) {
 }
 
 internal void
-escrever(void) {}
+escrever(void) {
+  Instrucao_No *instrucao = lista_escrita.cabeca;
+
+  UF *add     = banco_uf.add;
+  UF *mul     = banco_uf.mul;
+  UF *inteiro = banco_uf.inteiro;
+
+  Banco_Registradores registradores_usados = { 0 };
+
+  while (add) {
+    if (add->Qj) {
+      registradores_usados[add->Qj] = 1;
+    }
+    if (add->Qk) {
+      registradores_usados[add->Qk] = 1;
+    }
+
+    add++;
+  }
+
+  while (mul) {
+    if (mul->Qj) {
+      registradores_usados[mul->Qj] = 1;
+    }
+    if (mul->Qk) {
+      registradores_usados[mul->Qk] = 1;
+    }
+
+    mul++;
+  }
+
+  while (inteiro) {
+    if (inteiro->Qj) {
+      registradores_usados[inteiro->Qj] = 1;
+    }
+    if (inteiro->Qk) {
+      registradores_usados[inteiro->Qk] = 1;
+    }
+
+    inteiro++;
+  }
+
+  while (instrucao) {
+    uint8_t opcode = instrucao->instrucao >> 26;
+    if (opcode < 4) {
+      add = banco_uf.add;
+      for (int i = 0; i < instrucao->uf; i++) {
+        add++;
+      }
+
+      if (registradores_usados[add->Fi]) {
+        instrucao = instrucao->proximo;
+        continue;
+      }
+
+      add->busy = 0;
+      add_usados--;
+
+      barramento_escrever_dado(0, banco_registradores[add->Fi]);
+    } else if (opcode < 6) {
+      mul = banco_uf.mul;
+      for (int i = 0; i < instrucao->uf; i++) {
+        mul++;
+      }
+
+      if (registradores_usados[mul->Fi]) {
+        instrucao = instrucao->proximo;
+        continue;
+      }
+
+      mul->busy = 0;
+      mul_usados--;
+
+      barramento_escrever_dado(0, banco_registradores[mul->Fi]);
+    } else {
+      inteiro = banco_uf.inteiro;
+      for (int i = 0; i < instrucao->uf; i++) {
+        inteiro++;
+      }
+
+      if (registradores_usados[inteiro->Fi]) {
+        instrucao = instrucao->proximo;
+        continue;
+      }
+
+      inteiro->busy = 0;
+      int_usados--;
+
+      barramento_escrever_dado(0, banco_registradores[inteiro->Fi]);
+    }
+
+    instrucao = instrucao->proximo;
+  }
+}
 
 internal void
-executar(void) {}
+executar(void) {
+  Instrucao_No *instrucao = lista_executando.cabeca;
+
+  while (instrucao) {
+    if (instrucao->clocks_restantes > 0) {
+      instrucao->clocks_restantes--;
+    } else {
+      // TODO: Atualizar UF
+
+      // Mandar para escrita
+      mandar_escrever(instrucao);
+    }
+
+    instrucao = instrucao->proximo;
+  }
+}
 
 internal void
 mandar_ler(Instrucao_No *instrucao) {
@@ -324,5 +467,24 @@ mandar_executar(Instrucao_No *instrucao) {
   } else {
     lista_executando.fim->proximo = instrucao;
     lista_executando.fim          = instrucao;
+  }
+}
+
+internal void
+mandar_escrever(Instrucao_No *instrucao) {
+  Instrucao_No *executando = lista_executando.cabeca;
+
+  while (executando->proximo != instrucao) {
+    executando = executando->proximo;
+  }
+
+  executando->proximo = instrucao->proximo;
+
+  if (lista_escrita.cabeca == NULL) {
+    lista_escrita.cabeca = instrucao;
+    lista_escrita.fim    = instrucao;
+  } else {
+    lista_escrita.fim->proximo = instrucao;
+    lista_escrita.fim          = instrucao;
   }
 }

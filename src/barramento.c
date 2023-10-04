@@ -20,6 +20,11 @@ barramento_buscar_instrucao(int PC) {
   return instrucao;
 }
 
+void
+barramento_escrever_dado(int endereco, int dado) {
+  *((int *) &_memoria[endereco]) = dado;
+}
+
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PRIVATE FUNCTIONS                              *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */

@@ -26,14 +26,14 @@ typedef struct _status_instrucoes Status_Instrucoes;
 
 // Define um tipo enumerado para representar os tipos de Unidades Funcionais
 // (UFs).
-typedef enum _tipo_uf { add, mul, inteiro } Tipo_UF;
+typedef enum _tipo_uf { none = -1, add, mul, inteiro } Tipo_UF;
 
 // Define a estrutura de uma instrução no pipeline.
 struct _instrucao_no {
   uint32_t instrucao;        // A instrução em si (32 bits).
   int      clocks_restantes; // Quantidade de ciclos de clock restantes para
                              // conclusão.
-  tipo          tipo;        // O tipo de UF a que a instrução pertence.
+  Tipo_UF       tipo;        // O tipo de UF a que a instrução pertence.
   int           uf;          // O índice da UF a que a instrução pertence.
   Instrucao_No *proximo;     // Ponteiro para a próxima instrução na lista.
   int           index;
@@ -56,11 +56,11 @@ struct _status_registrador {
 // no pipeline.
 struct _status_instrucoes {
   char instrucao[128]; // A representação da instrução (texto).
-  char busca;          // Indica se a instrução está na etapa de busca.
-  char emissao;        // Indica se a instrução está na etapa de emissão.
-  char leitura; // Indica se a instrução está na etapa de leitura de operandos.
-  char execucao; // Indica se a instrução está na etapa de execução.
-  char escrita;  // Indica se a instrução está na etapa de escrita.
+  int  busca;          // Indica se a instrução está na etapa de busca.
+  int  emissao;        // Indica se a instrução está na etapa de emissão.
+  int leitura; // Indica se a instrução está na etapa de leitura de operandos.
+  int execucao; // Indica se a instrução está na etapa de execução.
+  int escrita;  // Indica se a instrução está na etapa de escrita.
 };
 
 // Variáveis globais para armazenar listas de instruções em diferentes etapas do
@@ -100,6 +100,9 @@ global Status_Registrador status_registrador[32] = { 0 };
 // Ponteiro global para um array de estruturas de status de instruções (alocado
 // dinamicamente).
 global Status_Instrucoes *status_instrucoes = NULL;
+
+// Variável estática persistente para manter o rastreamento do relógio
+global uint32_t clock = 0;
 
 // Protótipos de funções internas.
 internal void        adicionar_instrucao(uint32_t instrucao);
@@ -161,13 +164,17 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
     // Inicializa o status de cada instrução
     strncpy(instrucao->instrucao, decodificar_instrucao(i), 128);
 
-    instrucao->busca    = '-';
-    instrucao->emissao  = '-';
-    instrucao->leitura  = '-';
-    instrucao->execucao = '-';
-    instrucao->escrita  = '-';
+    instrucao->busca    = 0;
+    instrucao->emissao  = 0;
+    instrucao->leitura  = 0;
+    instrucao->execucao = 0;
+    instrucao->escrita  = 0;
 
     instrucao++;
+  }
+
+  for (uint i = 0; i < 32; i++) {
+    status_registrador[i].uf = none;
   }
 }
 
@@ -179,8 +186,8 @@ rodar_programa(char *nome_saida) {
   uint32_t instrucao;
 
   // Enquanto o programa estiver em execução
-  // while (rodando) {
-  for (int i = 0; i < 10; i++) {
+  // while (rodando)
+  for (int i = 0; i < 20; i++) {
     // Busca a próxima instrução na memória usando o valor atual de PC
     instrucao = barramento_buscar_instrucao(PC);
 
@@ -413,11 +420,7 @@ adicionar_instrucao(uint32_t instrucao) {
 
   Status_Instrucoes *status = status_instrucoes + instrucoes_emitidas;
 
-  status->busca    = 'X';
-  status->emissao  = '-';
-  status->leitura  = '-';
-  status->execucao = '-';
-  status->escrita  = '-';
+  status->busca = clock;
 
   // Aloca memória para um novo nó de instrução na lista de emissão
   Instrucao_No *no = (Instrucao_No *) malloc(sizeof(Instrucao_No));
@@ -451,9 +454,6 @@ adicionar_instrucao(uint32_t instrucao) {
 // estágios, o estado das unidades funcionais e o estado dos registradores.
 internal void
 printar_scoreboard(void) {
-  // Variável estática persistente para manter o rastreamento do relógio
-  local_persist uint32_t clock = 0;
-
   // Imprime o número do relógio atual
   printf("Clock: %u\n", clock);
 
@@ -484,31 +484,7 @@ printar_scoreboard(void) {
 // Write (WAW) com instruções já em execução
 internal void
 emitir(void) {
-  Instrucao_No *instrucao_emitida    = lista_emissao.cabeca;
-  Instrucao_No *instrucao_executando = lista_executando.cabeca;
-
-  Banco_Registradores registradores_usados = { 0 };
-
-  // Verifica os registradores usados pelas instruções em execução
-  while (instrucao_executando != NULL) {
-    switch (instrucao_executando->tipo) {
-    case R:
-      registradores_usados[(instrucao_executando->instrucao >> 11) & 0x1F] = 1;
-      break;
-    case I:
-      if ((instrucao_executando->instrucao >> 26) < 4) {
-        registradores_usados[(instrucao_executando->instrucao >> 16) & 0x1F] =
-            1;
-      } else {
-        registradores_usados[(instrucao_executando->instrucao >> 21) & 0x1F] =
-            1;
-      }
-      break;
-    case J: break;
-    }
-
-    instrucao_executando = instrucao_executando->proximo;
-  }
+  Instrucao_No *instrucao_emitida = lista_emissao.cabeca;
 
   // Emite as instruções para execução, considerando disponibilidade de UFs e
   // evitando WAW
@@ -518,9 +494,9 @@ emitir(void) {
     // Checa se UF disponível para a emissão da instrução
     if (opcode < 4 && add_usados < _cpu_specs.uf_add) {
       // UF de adição disponível
-    } else if (opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
+    } else if (opcode >= 4 && opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
       // UF de multiplicação disponível
-    } else if (opcode < 16 && int_usados < _cpu_specs.uf_int) {
+    } else if (opcode >= 6 && opcode < 16 && int_usados < _cpu_specs.uf_int) {
       // UF de inteiro disponível
     } else {
       // UF não disponível para a instrução, passa para a próxima
@@ -531,24 +507,37 @@ emitir(void) {
     // Checa se há WAW (escrever após escrever) para evitar conflitos
     switch (instrucao_emitida->tipo) {
     case R:
-      if (!registradores_usados[(instrucao_emitida->instrucao >> 11) & 0x1F]) {
+      if (status_registrador[(instrucao_emitida->instrucao >> 11) & 0x1F].uf
+          == none)
+      {
         // Não há dependências de escrita, pode emitir a instrução para execução
+
+        status_registrador[(instrucao_emitida->instrucao >> 11) & 0x1F].uf =
+            instrucao_emitida->tipo;
         mandar_ler(instrucao_emitida);
       }
       break;
     case I:
       if ((instrucao_emitida->instrucao >> 26) < 4) {
-        if (!registradores_usados[(instrucao_emitida->instrucao >> 16) & 0x1F])
+        if (status_registrador[(instrucao_emitida->instrucao >> 16) & 0x1F].uf
+            == none)
         {
           // Não há dependências de escrita, pode emitir a instrução para
           // execução
+
+          status_registrador[(instrucao_emitida->instrucao >> 16) & 0x1F].uf =
+              instrucao_emitida->tipo;
           mandar_ler(instrucao_emitida);
         }
       } else {
-        if (!registradores_usados[(instrucao_emitida->instrucao >> 21) & 0x1F])
+        if (status_registrador[(instrucao_emitida->instrucao >> 21) & 0x1F].uf
+            == none)
         {
           // Não há dependências de escrita, pode emitir a instrução para
           // execução
+
+          status_registrador[(instrucao_emitida->instrucao >> 21) & 0x1F].uf =
+              instrucao_emitida->tipo;
           mandar_ler(instrucao_emitida);
         }
       }
@@ -635,11 +624,11 @@ escrever(void) {
       add->busy = 0; // A UF está livre para ser utilizada
       add_usados--;  // Decrementa o contador de UFs de adição em uso
 
-      Status_Instrucoes *status = status_instrucoes + instrucao->index;
-
-      status->escrita = '-';
+      // Status_Instrucoes *status = status_instrucoes + instrucao->index;
 
       // Escreve o resultado no barramento de dados
+      status_registrador[add->Fi].uf = none;
+
       barramento_escrever_dado(0, banco_registradores[add->Fi]);
     } else if (opcode < 6) { // Instruções de multiplicação
       mul = banco_uf.mul;
@@ -658,11 +647,11 @@ escrever(void) {
       mul->busy = 0; // A UF está livre para ser utilizada
       mul_usados--;  // Decrementa o contador de UFs de multiplicação em uso
 
-      Status_Instrucoes *status = status_instrucoes + instrucao->index;
-
-      status->escrita = '-';
+      // Status_Instrucoes *status = status_instrucoes + instrucao->index;
 
       // Escreve o resultado no barramento de dados
+      status_registrador[mul->Fi].uf = none;
+
       barramento_escrever_dado(0, banco_registradores[mul->Fi]);
     } else if (opcode < 16) { // Instruções de inteiro
       inteiro = banco_uf.inteiro;
@@ -681,11 +670,13 @@ escrever(void) {
       inteiro->busy = 0; // A UF está livre para ser utilizada
       int_usados--;      // Decrementa o contador de UFs de inteiro em uso
 
-      Status_Instrucoes *status = status_instrucoes + instrucao->index;
+      // Status_Instrucoes *status = status_instrucoes + instrucao->index;
 
-      status->escrita = '-';
+      // status->escrita = '-';
 
       // Escreve o resultado no barramento de dados
+      status_registrador[inteiro->Fi].uf = none;
+
       barramento_escrever_dado(0, banco_registradores[inteiro->Fi]);
     }
 
@@ -706,8 +697,8 @@ executar(void) {
       // Decrementa o contador de ciclos restantes para a instrução
       Status_Instrucoes *status = status_instrucoes + instrucao->index;
 
-      status->leitura  = '-';
-      status->execucao = 'X';
+      // status->leitura  = '-';
+      status->execucao = clock;
 
       instrucao->clocks_restantes--;
     } else {
@@ -732,8 +723,7 @@ mandar_ler(Instrucao_No *instrucao) {
 
   if (emitida) {
     Status_Instrucoes *status = status_instrucoes + emitida->index;
-    status->busca             = '-';
-    status->emissao           = 'X';
+    status->emissao           = clock;
   }
 
   // Verifica se a instrução a ser lida é a primeira na lista de emissão
@@ -788,8 +778,8 @@ mandar_executar(Instrucao_No *instrucao) {
 
   if (leitura) {
     Status_Instrucoes *status = status_instrucoes + leitura->index;
-    status->emissao           = '-';
-    status->leitura           = 'X';
+    // status->emissao           = '-';
+    status->leitura = clock;
   }
 
   // Verifica se a instrução a ser executada é a primeira na lista de leitura
@@ -846,8 +836,8 @@ mandar_escrever(Instrucao_No *instrucao) {
 
   if (executando) {
     Status_Instrucoes *status = status_instrucoes + executando->index;
-    status->execucao          = '-';
-    status->escrita           = 'X';
+    // status->execucao          = '-';
+    status->escrita = clock;
   }
 
   // Verifica se a instrução a ser escrita é a primeira na lista de execução
@@ -973,7 +963,7 @@ printar_instrucoes(void) {
   Status_Instrucoes *instrucao = status_instrucoes;
 
   for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    printf("| %32s | %c       | %c      | %c     | %c       | %c      |\n",
+    printf("| %32s | %d       | %d      | %d     | %d       | %d      |\n",
            instrucao->instrucao, instrucao->busca, instrucao->emissao,
            instrucao->leitura, instrucao->execucao, instrucao->escrita);
     instrucao++;

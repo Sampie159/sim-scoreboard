@@ -145,6 +145,8 @@ ler_dados(Leitor *l, char *memoria, uint32_t *idx) {
       char *identificador        = ler_identificador(l);
       *((int *) &memoria[*idx])  = atoi(identificador);
       (*idx)                    += 4;
+    } else if (l->ch == '#') {
+      ignorar_comentario(l);
     }
   }
 }

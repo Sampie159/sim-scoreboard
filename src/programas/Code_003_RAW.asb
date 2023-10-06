@@ -1,0 +1,40 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+	10           # Define um valor constante 10
+	20           # Define um valor constante 20
+.text          
+	# Instrução 1
+	add r1, r2, r3    # Adiciona o conteúdo de r2 e r3 e armazena o resultado em r1
+
+	# Instrução 2 com dependência RAW em r1
+	sub r4, r1, r5    # Subtrai o conteúdo de r1 de r5 e armazena o resultado em r4
+
+	# Instrução 3 com dependência RAW em r4
+	mul r6, r4, r7    # Multiplica o conteúdo de r4 e r7 e armazena o resultado em r6
+
+	# Instrução 4 com dependência RAW em r6
+	addi r8, r6, 100  # Adiciona o valor imediato 100 a r6 e armazena o resultado em r8
+
+	# Instrução 5
+	exit

@@ -1,0 +1,90 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+	-1			    # Define um valor constante -1
+	0			    # Define um valor constante 0
+	1 			    # Define um valor constante 1
+	2 			    # Define um valor constante 2
+	5 			    # Define um valor constante 5
+	15			    # Define um valor constante 15
+.text
+
+main:
+	# Instrução 1
+	lw r1, 15                   # Carrega o valor alvo em r1
+    
+    	# Instrução 2
+    	lw r2, 5                    # Carrega o tamanho do array em  r2
+    
+    	# Instrução 3
+    	lw r6, array                # Carrega o endereço do array em r6
+    
+    	# Instrução 4
+    	li r3, 0                    # Inicializa r3 com 0 (índice inicial)
+    
+    	# Instrução 5
+    	subi r2, r2, 1              # Subtrai 1 do tamanho para obter o índice máximo
+
+busca_binaria:
+    	# Instrução 6
+    	bge r3, r2, nao_encontrado  # Se o índice inicial for maior que o índice máximo, o valor não foi encontrado
+
+    	# Instrução 7
+    	add r4, r3, r2              # Calcula a média entre o índice inicial e o índice máximo
+    
+    	# Instrução 8
+    	div r4, r4, 2               # Divide por 2
+    
+    	# Instrução 9
+    	lw r5, (r6, r4, 4)          # Carrega o valor do meio do array em r5 (multiplicamos por 4 porque cada elemento é uma palavra de 4 bytes)
+
+    	# Instrução 10
+    	beq r5, r1, encontrado      # Se o valor do meio for igual ao valor alvo, encontramos o valor
+    
+    	# Instrução 11
+    	bgt r5, r1, menor           # Se o valor do meio for maior que o valor alvo, vá para a metade menor
+    
+    	# Instrução 12
+    	j maior                     # Caso contrário, vá para a metade maior
+
+menor:
+    	# Instrução 13
+    	addi r2, r4, -1             # Atualiza o índice máximo para a metade menor
+    
+    	# Instrução 14
+    	j busca_binaria
+
+maior:
+    	# Instrução 15
+    	addi r3, r4, 1              # Atualiza o índice inicial para a metade maior
+    
+    	# Instrução 16
+    	j busca_binaria
+
+encontrado:
+    	exit			    # Finaliza o programa
+
+nao_encontrado:
+    	exit			    # Finaliza o programa
+
+

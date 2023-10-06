@@ -1,0 +1,58 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+	10           	# Define um valor constante 10
+  	20           	# Define um valor constante 20
+  	30           	# Define um valor constante 30
+  	100          	# Define um valor constante 100
+  
+.text           
+	# Instrução 1
+	add r1, r2, r3    # Adiciona o conteúdo de r2 e r3 e armazena o resultado em r1
+
+	# Instrução 2 com dependência WAW em r1
+	sub r1, r4, r5    # Subtrai o conteúdo de r4 de r5 e armazena o resultado em r1
+
+	# Instrução 3 com dependência WAR em r4 e WAW em r1
+	mul r4, r6, r7    # Multiplica o conteúdo de r6 e r7 e armazena o resultado em r4
+
+	# Instrução 4 com dependência RAW em r4 e WAW em r1
+	addi r8, r4, 100  # Adiciona o valor imediato 100 a r4 e armazena o resultado em r8
+	
+	# Instrução 5
+	add r5, r1, r2
+	
+	# Instrução 6
+	sub r6, r3, r4
+	
+	# Instrução 7
+	and r7, r5, r6
+	
+	# Instrução 8
+	or r8, r1, r2
+	
+	# Instrução 9
+	not r9, r3, r4
+
+	# Instrução 10
+	exit		# Finaliza o programa

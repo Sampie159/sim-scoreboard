@@ -1,0 +1,55 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+    0
+    1	
+    50
+
+.text
+main:
+    # Instrução 1: Carrega N=50 em r1
+    lw r1, 50
+
+    # Instrução 2: Inicializa o resultado (r2) com 0
+    li r2, 0
+
+loop:
+    # Instrução 3: Verifica se N é zero (fim do loop)
+    beq r1, 0, done
+
+    # Instrução 3: Adiciona r1 a r2
+    add r2, r2, r1
+
+    # Instrução 4: Decrementa N em 1
+    subi r1, r1, 1
+
+    # Instrução 5: Salta de volta para o início do loop
+    j loop
+
+done:
+    # Instrução 6: O resultado da soma é armazenado
+    sw r2
+
+    # Instrução 7: Finaliza o programa
+    exit
+

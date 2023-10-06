@@ -1,0 +1,56 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+	1			# Define um valor constante 1
+	5			# Define um valor constante 5
+
+.text
+main:
+    	# Instrução 1
+    	lw r1, 5           	 # Carrega o número 'escolhido para o fatorial' em r1
+    
+    	# Instrução 2
+    	li r2, 1                 # Inicializa r2 com 1 (contador)
+    
+    	# Instrução 3
+    	li r3, 1                 # Inicializa r3 com 1 (resultado)
+
+loop:
+	# Instrução 4
+    	beq r2, r1, done         # Verifica se o contador é igual ao número
+    
+    	# Instrução 5
+    	mul r3, r3, r2           # Multiplica o resultado r3 por r2
+    
+    	# Instrução 6
+    	addi r1, r1, 1           # Incrementa o contador
+    
+    	# Instrução 7
+    	j loop                   # Volta para o início do loop
+
+done:
+    	# Instrução 8
+    	sw r3        	     	# Armazena o resultado
+
+    	# Instrução 9
+    	exit 		     	# Finaliza o programa

@@ -1,0 +1,42 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+  10           # Define um valor constante 10
+  20           # Define um valor constante 20
+
+.text          
+
+    # Instrução 1
+    add r2, r1, r3  # Adiciona a soma de r1 e r3 e armazena o resultado em r2
+
+    # Instrução 2 com dependência WAR em r1
+    sub r1, r5, r4  # Subtrai o conteúdo de r5 de r4 e armazena o resultado em r1
+
+    # Instrução 3 
+    mul r6, r7, r1  # Multiplica o conteúdo de r7 por r1 e armazena o resultado em r6
+
+    # Instrução 4 com dependência WAR em r7
+    addi r7, r1, 100  # Adiciona o valor imediato 100 a r1 e armazena o resultado em r7
+    
+    # Instrução 5
+    exit

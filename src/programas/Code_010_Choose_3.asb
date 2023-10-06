@@ -1,0 +1,71 @@
+/*
+UF:
+  add: 5
+  mul: 5
+  inteiro: 5
+INST:
+  add: 2
+  addi: 2
+  sub: 2
+  subi: 2
+  mul: 10
+  div: 40
+  and: 1
+  or: 1
+  not: 1
+  blt: 2
+  bgt: 2
+  beq: 2
+  lw: 2
+  sw: 2
+*/
+
+.data
+    0
+    1
+    2
+    17
+
+.text
+main:
+    # Instrução 1: Carrega o número a ser verificado em r1
+    lw r1, 17
+
+    # Instrução 2: Carrega o resultado r2 com 1 (Assumindo que é primo)
+    lw r2, 1
+
+    # Instrução 3: Verifica a divisibilidade por todos os números de 2 a n-1
+    lw r3, 2
+
+loop:
+    # Instrução 4: Calcula r1 - r3 e armazena em r4
+    sub r4, r1, r3
+
+    # Instrução 5: Verifica se r4 é zero (divisível)
+    beq r4, 0, not_prime
+
+    # Instrução 6: Incrementa r3
+    addi r3, r3, 1
+
+    # Instrução 7: Verifica se r3 é maior ou igual a r1 (fim do loop)
+    beq r3, r1, primo
+
+    # Instrução 8: Salta para o início do loop
+    j loop
+
+nao_primo:
+    # Instrução 9: Define r2 como 0 (não é primo) e salta para o fim do programa
+    li r2, 0
+    j done
+
+primo:
+    # Instrução 10: O resultado (1) é armazenado (é primo)
+    sw r2
+
+    # Instrução 11: Finaliza o programa
+    j done
+
+done:
+    # Instrução 12: Finaliza o programa
+    exit
+S

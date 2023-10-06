@@ -51,7 +51,7 @@ global uint32_t clock = 0;
 
 // Protótipos de funções internas.
 internal void        adicionar_instrucao(uint32_t instrucao);
-internal void        printar_scoreboard(void);
+internal void        printar_scoreboard(FILE *arq);
 internal void        emitir(void);
 internal void        leitura_operandos(void);
 internal void        executar(void);
@@ -59,9 +59,9 @@ internal void        escrever(void);
 internal void        mandar_ler(Instrucao_No *instrucao);
 internal void        mandar_executar(Instrucao_No *instrucao);
 internal void        mandar_escrever(Instrucao_No *instrucao);
-internal void        printar_ufs(void);
-internal void        printar_status_registradores(void);
-internal void        printar_instrucoes(void);
+internal void        printar_ufs(FILE *arq);
+internal void        printar_status_registradores(FILE *arq);
+internal void        printar_instrucoes(FILE *arq);
 internal const char *decodificar_instrucao(uint32_t instrucao);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -128,9 +128,10 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
 void
 rodar_programa(char *nome_saida) {
   uint32_t instrucao;
+  FILE    *arq = fopen(nome_saida, "w");
 
   // Enquanto o programa estiver em execução
-  // while (rodando)
+  // while (rodando) {
   for (int i = 0; i < 20; i++) {
     // Busca a próxima instrução na memória usando o valor atual de PC
     instrucao = barramento_buscar_instrucao(PC);
@@ -162,8 +163,10 @@ rodar_programa(char *nome_saida) {
 
     // Imprime o estado do scoreboard (pode ser uma representação do estado das
     // UFs e registradores)
-    printar_scoreboard();
+    printar_scoreboard(arq);
   }
+
+  fclose(arq);
 }
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
@@ -397,12 +400,12 @@ adicionar_instrucao(uint32_t instrucao) {
 // número de relógio atual(clock), o estado das instruções em diferentes
 // estágios, o estado das unidades funcionais e o estado dos registradores.
 internal void
-printar_scoreboard(void) {
+printar_scoreboard(FILE *arq) {
   // Imprime o número do relógio atual
-  printf("Clock: %u\n", clock);
+  fprintf(arq, "Clock: %u\n", clock);
 
   // Imprime o estado das instruções
-  printar_instrucoes();
+  printar_instrucoes(arq);
 
   // Estado das unidades funcionais (UFs)
   UF *add     = banco_uf.add;
@@ -410,12 +413,13 @@ printar_scoreboard(void) {
   UF *inteiro = banco_uf.inteiro;
 
   // Imprime o estado das unidades funcionais
-  printar_ufs();
+  printar_ufs(arq);
 
   // Imprime o estado dos registradores
-  printar_status_registradores();
+  printar_status_registradores(arq);
 
-  printf(
+  fprintf(
+      arq,
       "---------------------------------------------------------------------"
       "-----------------\n");
 
@@ -836,47 +840,51 @@ mandar_escrever(Instrucao_No *instrucao) {
 // A função é responsável por imprimir o status das Unidades Funcionais (UFs) no
 // formato de uma tabela.
 internal void
-printar_ufs(void) {
+printar_ufs(FILE *arq) {
   UF *add     = banco_uf.add;
   UF *mul     = banco_uf.mul;
   UF *inteiro = banco_uf.inteiro;
 
-  printf("\nName\tBusy\tOperation\tFi\tFj\tFk\tQj\tQk\tRj\tRk\n");
+  fprintf(arq, "\nName\tBusy\tOperation\tFi\tFj\tFk\tQj\tQk\tRj\tRk\n");
 
-  printf(
+  fprintf(
+      arq,
       "------------------------------------------------------------------------"
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_add; i++) {
-    printf("ADD %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, add->busy,
-           add->operacao, add->Fi, add->Fj, add->Fk, add->Qj, add->Qk, add->Rj,
-           add->Rk);
+    fprintf(arq, "ADD %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i,
+            add->busy, add->operacao, add->Fi, add->Fj, add->Fk, add->Qj,
+            add->Qk, add->Rj, add->Rk);
     add++;
   }
 
-  printf(
+  fprintf(
+      arq,
       "------------------------------------------------------------------------"
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
-    printf("MUL %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, mul->busy,
-           mul->operacao, mul->Fi, mul->Fj, mul->Fk, mul->Qj, mul->Qk, mul->Rj,
-           mul->Rk);
+    fprintf(arq, "MUL %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i,
+            mul->busy, mul->operacao, mul->Fi, mul->Fj, mul->Fk, mul->Qj,
+            mul->Qk, mul->Rj, mul->Rk);
     mul++;
   }
 
-  printf(
+  fprintf(
+      arq,
       "------------------------------------------------------------------------"
       "-----------------\n");
 
   for (uint i = 0; i < _cpu_specs.uf_int; i++) {
-    printf("INT %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i, inteiro->busy,
-           inteiro->operacao, inteiro->Fi, inteiro->Fj, inteiro->Fk,
-           inteiro->Qj, inteiro->Qk, inteiro->Rj, inteiro->Rk);
+    fprintf(arq, "INT %u:\t%u\t%u\t\t%u\t%u\t%d\t%d\t%d\t%d\t%d|\n", i,
+            inteiro->busy, inteiro->operacao, inteiro->Fi, inteiro->Fj,
+            inteiro->Fk, inteiro->Qj, inteiro->Qk, inteiro->Rj, inteiro->Rk);
     inteiro++;
   }
 
-  printf(
+  fprintf(
+      arq,
       "------------------------------------------------------------------------"
       "-----------------\n");
 }
@@ -884,37 +892,40 @@ printar_ufs(void) {
 // A função é responsável por imprimir o status dos registradores, mostrando a
 // UF associada a cada registrador e sua posição atual.
 internal void
-printar_status_registradores(void) {
-  printf("\nRegistradores:\n\n");
+printar_status_registradores(FILE *arq) {
+  fprintf(arq, "\nRegistradores:\n\n");
 
   // Itera sobre os registradores
   for (uint i = 0; i < 32; i++) {
     // Obtém o nome da UF associada ao registrador
     char *uf = Tipo_UF_Nome[status_registrador[i].uf];
     // Imprime o status do registrador
-    printf("R%u:\t%s\t%u\n", i, uf, status_registrador[i].pos);
+    fprintf(arq, "R%u:\t%s\t%u\n", i, uf, status_registrador[i].pos);
   }
 }
 
 // A função é responsável por imprimir o status das instruções em cada etapa do
 // pipeline, incluindo busca, emissão, leitura, execução e escrita.
 internal void
-printar_instrucoes(void) {
-  printf(
+printar_instrucoes(FILE *arq) {
+  fprintf(
+      arq,
       "+----------------------------------+---------+--------+-------+---------"
       "+--------+\n");
-  printf(
-      "| Instrução                        | Busca   | Emissão| Leitura| "
-      "Execução| Escrita|\n");
-  printf(
+  fprintf(arq,
+          "| Instrução                        | Busca   | Emissão| Leitura| "
+          "Execução| Escrita|\n");
+  fprintf(
+      arq,
       "+----------------------------------+---------+--------+-------+---------"
       "+--------+\n");
   Status_Instrucoes *instrucao = status_instrucoes;
 
   for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    printf("| %32s | %d       | %d      | %d     | %d       | %d      |\n",
-           instrucao->instrucao, instrucao->busca, instrucao->emissao,
-           instrucao->leitura, instrucao->execucao, instrucao->escrita);
+    fprintf(arq,
+            "| %32s | %d       | %d      | %d     | %d       | %d      |\n",
+            instrucao->instrucao, instrucao->busca, instrucao->emissao,
+            instrucao->leitura, instrucao->execucao, instrucao->escrita);
     instrucao++;
   }
 }

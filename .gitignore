@@ -2,3 +2,4 @@ obj
 sim-sb
 perf.data
 .cache/clangd/index
+scoreboard.out

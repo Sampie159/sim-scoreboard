@@ -723,38 +723,22 @@ executar(void) {
 // executada.
 internal void
 mandar_ler(Instrucao *instrucao) {
-  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    Instrucao *emissao = lista_emissao + i;
+  status_instrucoes[instrucao->index].emissao = '-';
+  status_instrucoes[instrucao->index].leitura = 'X';
 
-    if (emissao == instrucao) {
-      // Remove a instrução da lista de emissão, pois está pronta para leitura
-
-      status_instrucoes[i].emissao = '-';
-      status_instrucoes[i].leitura = 'X';
-
-      lista_emissao[i] = (Instrucao){ 0 };
-      lista_leitura[i] = *instrucao;
-    }
-  }
+  lista_leitura[instrucao->index] = *instrucao;
+  lista_emissao[instrucao->index] = (Instrucao){ 0 };
 }
 
 // A função é responsável por mover uma instrução da lista de leitura para a
 // lista de execução, indicando que a instrução está pronta para ser executada.
 internal void
 mandar_executar(Instrucao *instrucao) {
-  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    Instrucao *leitura = lista_leitura + i;
+  status_instrucoes[instrucao->index].leitura  = '-';
+  status_instrucoes[instrucao->index].execucao = 'X';
 
-    if (leitura == instrucao) {
-      // Remove a instrução da lista de leitura, pois está pronta para execução
-
-      status_instrucoes[i].leitura  = '-';
-      status_instrucoes[i].execucao = 'X';
-
-      lista_leitura[i]    = (Instrucao){ 0 };
-      lista_executando[i] = *instrucao;
-    }
-  }
+  lista_executando[instrucao->index] = *instrucao;
+  lista_leitura[instrucao->index]    = (Instrucao){ 0 };
 }
 
 // A função é responsável por mover uma instrução da lista de execução para a
@@ -762,19 +746,11 @@ mandar_executar(Instrucao *instrucao) {
 // resultado.
 internal void
 mandar_escrever(Instrucao *instrucao) {
-  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    Instrucao *executando = lista_executando + i;
+  status_instrucoes[instrucao->index].execucao = '-';
+  status_instrucoes[instrucao->index].escrita  = 'X';
 
-    if (executando == instrucao) {
-      // Remove a instrução da lista de execução, pois está pronta para escrita
-
-      status_instrucoes[i].execucao = '-';
-      status_instrucoes[i].escrita  = 'X';
-
-      lista_executando[i] = (Instrucao){ 0 };
-      lista_escrita[i]    = *instrucao;
-    }
-  }
+  lista_escrita[instrucao->index]    = *instrucao;
+  lista_executando[instrucao->index] = (Instrucao){ 0 };
 }
 
 // A função é responsável por imprimir o status das Unidades Funcionais (UFs) no

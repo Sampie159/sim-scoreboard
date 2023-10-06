@@ -1,74 +1,121 @@
-#include "cpu.h"
-
-#include "barramento.h"
-#include "defs.h"
-#include "hashtables.h"
-#include "memoria.h"
-
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 
-typedef struct _lista_instrucoes   Lista_Instrucoes;
-typedef struct _instrucao_no       Instrucao_No;
-typedef struct _status_registrador Status_Registrador;
-typedef struct _status_instrucoes  Status_Instrucoes;
+// Header dos módulos
+#include "barramento.h"
+#include "cpu.h"
+#include "defs.h"
+#include "hashtables.h"
+#include "memoria.h"
 
+// Define uma estrutura para armazenar uma lista de instruções no pipeline.
+typedef struct _lista_instrucoes Lista_Instrucoes;
+
+// Define uma estrutura para armazenar informações sobre uma instrução no
+// pipeline.
+typedef struct _instrucao_no Instrucao_No;
+
+// Define uma estrutura para armazenar informações sobre o status de um
+// registrador.
+typedef struct _status_registrador Status_Registrador;
+
+// Define uma estrutura para armazenar informações sobre o status de instruções
+// no pipeline.
+typedef struct _status_instrucoes Status_Instrucoes;
+
+// Define um tipo enumerado para representar os tipos de Unidades Funcionais
+// (UFs).
 typedef enum _tipo_uf { add, mul, inteiro } Tipo_UF;
 
+// Define a estrutura de uma instrução no pipeline.
 struct _instrucao_no {
-  uint32_t      instrucao;
-  int           clocks_restantes;
-  tipo          tipo;
-  int           uf;
-  Instrucao_No *proximo;
+  uint32_t instrucao;        // A instrução em si (32 bits).
+  int      clocks_restantes; // Quantidade de ciclos de clock restantes para
+                             // conclusão.
+  tipo          tipo;        // O tipo de UF a que a instrução pertence.
+  int           uf;          // O índice da UF a que a instrução pertence.
+  Instrucao_No *proximo;     // Ponteiro para a próxima instrução na lista.
+  int           index;
 };
 
+// Define uma estrutura para representar uma lista de instruções no pipeline.
 struct _lista_instrucoes {
-  Instrucao_No *cabeca;
-  Instrucao_No *fim;
+  Instrucao_No *cabeca; // Ponteiro para a primeira instrução da lista.
+  Instrucao_No *fim;    // Ponteiro para a última instrução da lista.
 };
 
+// Define uma estrutura para armazenar informações sobre o status de um
+// registrador.
 struct _status_registrador {
-  Tipo_UF uf;
-  int     pos;
+  Tipo_UF uf;  // O tipo de UF associado ao registrador.
+  int     pos; // A posição atual do registrador.
 };
 
+// Define uma estrutura para armazenar informações sobre o status de instruções
+// no pipeline.
 struct _status_instrucoes {
-  char *instrucao;
-  char  busca;
-  char  emissao;
-  char  leitura;
-  char  execucao;
-  char  escrita;
+  char instrucao[128]; // A representação da instrução (texto).
+  char busca;          // Indica se a instrução está na etapa de busca.
+  char emissao;        // Indica se a instrução está na etapa de emissão.
+  char leitura; // Indica se a instrução está na etapa de leitura de operandos.
+  char execucao; // Indica se a instrução está na etapa de execução.
+  char escrita;  // Indica se a instrução está na etapa de escrita.
 };
 
-global Lista_Instrucoes    lista_emissao    = { 0 };
-global Lista_Instrucoes    lista_leitura    = { 0 };
-global Lista_Instrucoes    lista_executando = { 0 };
-global Lista_Instrucoes    lista_escrita    = { 0 };
-global uint32_t            ClockMap[17]     = { 0 };
-global uint32_t            add_usados = 0, mul_usados = 0, int_usados = 0;
-global int                 PC                     = 100;
-global CPU_Specs           _cpu_specs             = { 0 };
-global Banco_Registradores banco_registradores    = { 0 };
-global Banco_UF            banco_uf               = { 0 };
-global int                 rodando                = 1;
-global Status_Registrador  status_registrador[32] = { 0 };
-global Status_Instrucoes  *status_instrucoes      = NULL;
+// Variáveis globais para armazenar listas de instruções em diferentes etapas do
+// pipeline.
+global Lista_Instrucoes lista_emissao    = { 0 };
+global Lista_Instrucoes lista_leitura    = { 0 };
+global Lista_Instrucoes lista_executando = { 0 };
+global Lista_Instrucoes lista_escrita    = { 0 };
+global Lista_Instrucoes lista_concluida  = { 0 };
 
-internal void adicionar_instrucao(uint32_t instrucao);
-internal void printar_scoreboard(void);
-internal void emitir(void);
-internal void leitura_operandos(void);
-internal void executar(void);
-internal void escrever(void);
-internal void mandar_ler(Instrucao_No *instrucao);
-internal void mandar_executar(Instrucao_No *instrucao);
-internal void mandar_escrever(Instrucao_No *instrucao);
-internal void printar_ufs(void);
-internal void printar_status_registradores(void);
-internal void printar_instrucoes(void);
+// Array para mapear tempos de clock para cada tipo de instrução.
+global uint32_t ClockMap[17] = { 0 };
+
+// Contadores globais para rastrear o uso de UFs.
+global uint32_t add_usados = 0, mul_usados = 0, int_usados = 0;
+
+// Registrador de programa (PC) global inicializado com o valor 100.
+global int PC = 100;
+
+// Estrutura que armazena as especificações da CPU.
+global CPU_Specs _cpu_specs = { 0 };
+
+// Banco de registradores global.
+global Banco_Registradores banco_registradores = { 0 };
+
+// Banco de UFs global.
+global Banco_UF banco_uf = { 0 };
+
+// Variável global que indica se a CPU está em execução (inicialmente definida
+// como 1).
+global int rodando = 1;
+
+// Array global para armazenar o status de registradores (32 registradores no
+// total).
+global Status_Registrador status_registrador[32] = { 0 };
+
+// Ponteiro global para um array de estruturas de status de instruções (alocado
+// dinamicamente).
+global Status_Instrucoes *status_instrucoes = NULL;
+
+// Protótipos de funções internas.
+internal void        adicionar_instrucao(uint32_t instrucao);
+internal void        printar_scoreboard(void);
+internal void        emitir(void);
+internal void        leitura_operandos(void);
+internal void        executar(void);
+internal void        escrever(void);
+internal void        mandar_ler(Instrucao_No *instrucao);
+internal void        mandar_executar(Instrucao_No *instrucao);
+internal void        mandar_escrever(Instrucao_No *instrucao);
+internal void        printar_ufs(void);
+internal void        printar_status_registradores(void);
+internal void        printar_instrucoes(void);
+internal void        atualizar_instrucoes(void);
+internal const char *decodificar_instrucao(uint32_t instrucao);
 
 /* * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * *
  *                          PUBLIC FUNCTIONS                               *
@@ -76,7 +123,10 @@ internal void printar_instrucoes(void);
 
 void
 scoreboard_inicializar(CPU_Specs *cpu_specs) {
-  _cpu_specs   = *cpu_specs;
+  // Copia as especificações da CPU para uma variável global _cpu_specs
+  _cpu_specs = *cpu_specs;
+
+  // Mapeia os tempos de clock para cada tipo de instrução no array ClockMap
   ClockMap[0]  = _cpu_specs.clock_add;
   ClockMap[1]  = _cpu_specs.clock_addi;
   ClockMap[2]  = _cpu_specs.clock_sub;
@@ -95,30 +145,72 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
   ClockMap[15] = _cpu_specs.clock_store;
   ClockMap[16] = _cpu_specs.clock_exit;
 
+  // Aloca memória para as unidades funcionais (UFs) 'add', 'mul' e 'inteiro'
   banco_uf.add     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_add);
   banco_uf.mul     = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_mul);
   banco_uf.inteiro = (UF *) malloc(sizeof(UF) * _cpu_specs.uf_int);
 
+  // Aloca memória para a estrutura de status de instruções com base na
+  // quantidade de instruções
   status_instrucoes = (Status_Instrucoes *) malloc(sizeof(Status_Instrucoes)
                                                    * _cpu_specs.qtd_instrucoes);
+
+  Status_Instrucoes *instrucao = status_instrucoes;
+
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    // Inicializa o status de cada instrução
+    strncpy(instrucao->instrucao, decodificar_instrucao(i), 128);
+
+    instrucao->busca    = '-';
+    instrucao->emissao  = '-';
+    instrucao->leitura  = '-';
+    instrucao->execucao = '-';
+    instrucao->escrita  = '-';
+
+    instrucao++;
+  }
 }
 
+// A função representa o ciclo de execução principal de um programa. Ele busca,
+// executa, gerencia dependências entre instruções e move o PC para a próxima
+// instrução em um loop contínuo até que a condição rodando seja falsa.
 void
 rodar_programa(char *nome_saida) {
   uint32_t instrucao;
 
-  while (rodando) {                              // 0x10 = EXIT
-    instrucao = barramento_buscar_instrucao(PC); // Busca inicial
-    escrever();                                  // Escrita
-    executar();                                  // Execução
-    leitura_operandos();                         // Leitura dos operandos
-                                                 // Busca e emite no mesmo clock
+  // Enquanto o programa estiver em execução
+  // while (rodando) {
+  for (int i = 0; i < 10; i++) {
+    // Busca a próxima instrução na memória usando o valor atual de PC
+    instrucao = barramento_buscar_instrucao(PC);
+
+    // Estágio de escrita, onde são concluídas as instruções anteriores e seus
+    // resultados são registrados
+    escrever();
+
+    // Estágio de execução, onde as instruções são executadas e os resultados
+    // são calculados
+    executar();
+
+    // Estágio de leitura de operandos, onde são identificadas as dependências
+    // entre instruções
+    leitura_operandos();
+
     if (instrucao) {
-      adicionar_instrucao(instrucao);            // Parte da busca
+      // Adiciona a instrução atual à lista de instruções em execução (parte da
+      // fase de busca)
+      adicionar_instrucao(instrucao);
     }
-    emitir();                                    // Emissão
+
+    // Estágio de emissão, onde os resultados calculados são transmitidos para
+    // as unidades funcionais
+    emitir();
+
     // TODO: Mudar local do PC
-    PC += 4; // Incrementa o PC
+    PC += 4; // Incrementa o PC em 4 bytes (Avança para a próxima instrução)
+
+    // Imprime o estado do scoreboard (pode ser uma representação do estado das
+    // UFs e registradores)
     printar_scoreboard();
   }
 }
@@ -127,77 +219,116 @@ rodar_programa(char *nome_saida) {
  *                          PRIVATE FUNCTIONS                              *
  * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * * */
 
+// A função realiza uma série de tarefas, incluindo a verificação de
+// dependências de dados entre instruções, a marcação de registradores usados, a
+// execução de instruções e a configuração das unidades funcionais com base no
+// tipo de instrução.
 internal void
 leitura_operandos(void) {
   // Encontra a instrução que está sendo executada
-  UF *add     = banco_uf.add;
-  UF *mul     = banco_uf.mul;
-  UF *inteiro = banco_uf.inteiro;
+  UF *add =
+      banco_uf.add; // Inicializa um ponteiro UF para a unidade funcional 'add'.
+  UF *mul =
+      banco_uf.mul; // Inicializa um ponteiro UF para a unidade funcional 'mul'.
+  UF *inteiro = banco_uf.inteiro; // Inicializa um ponteiro UF para a unidade
+                                  // funcional 'inteiro'.
 
-  Banco_Registradores registradores_usados = { 0 };
+  Banco_Registradores registradores_usados = {
+    0
+  }; // Inicializa uma estrutura de registro para rastrear registradores usados.
 
+  // Itera pelas UFs do tipo 'add' e verifica quais registradores estão sendo
+  // usados.
   for (uint i = 0; i < _cpu_specs.uf_add; i++) {
     if (add->Fi > -1) {
-      registradores_usados[add->Fi] = 1;
+      registradores_usados[add->Fi] = 1; // Marca o registrador como usado
     }
     add++;
   }
 
+  // Itera pelas UFs do tipo 'mul' e verifica quais registradores estão sendo
+  // usados.
   for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
     if (mul->Fi > -1) {
-      registradores_usados[mul->Fi] = 1;
+      registradores_usados[mul->Fi] = 1; // Marca o registrador como usado
     }
     mul++;
   }
 
+  // Itera pelas UFs do tipo 'inteiro' e verifica quais registradores estão
+  // sendo usados.
   for (uint i = 0; i < _cpu_specs.uf_int; i++) {
     if (inteiro->Fi > -1) {
-      registradores_usados[inteiro->Fi] = 1;
+      registradores_usados[inteiro->Fi] = 1; // Marca o registrador como usado
     }
     inteiro++;
   }
 
-  // Checar RAW
+  // Checa a dependência RAW (Read-After-Write) nas instruções.
   Instrucao_No *instrucao = lista_leitura.cabeca;
-  while (instrucao != NULL) {
-    uint8_t opcode = instrucao->instrucao >> 26;
-    int8_t  rd = -1, rs = -1, rt = -1;
-    int16_t imm = -1, extra = -1;
-    int32_t end = -1;
 
+  // Enquanto houver instruções na lista
+  while (instrucao != NULL) {
+    uint8_t opcode = instrucao->instrucao >> 26; // Extrai o opcode da instrução
+    int8_t rd = -1, rs = -1,
+           rt   = -1; // Inicializa registradores de destino, fonte 1 e fonte 2
+    int16_t imm = -1, extra = -1; // Inicializa valores imediatos e extras
+    int32_t end = -1;             // Inicializa um destino
+
+    // Determina o tipo da instrução com base no opcode
     switch (OpCodeTipo[opcode]) {
-    case R:
-      rd    = (instrucao->instrucao >> 11) & 0x1F;
-      rs    = (instrucao->instrucao >> 21) & 0x1F;
-      rt    = (instrucao->instrucao >> 16) & 0x1F;
-      extra = instrucao->instrucao & 0x7FF;
+    case R:      // Instrução do tipo R (registrador)
+      rd = (instrucao->instrucao >> 11)
+         & 0x1F; // Extrai o registrador de destino
+      rs = (instrucao->instrucao >> 21)
+         & 0x1F; // Extrai o registrador de fonte 1
+      rt = (instrucao->instrucao >> 16)
+         & 0x1F; // Extrai o registrador de fonte 2
+      extra = instrucao->instrucao & 0x7FF; // Extrai informações extras
       break;
-    case I:
-      rt  = (instrucao->instrucao >> 16) & 0x1F;
-      rs  = (instrucao->instrucao >> 21) & 0x1F;
-      imm = instrucao->instrucao & 0xFFFF;
+    case I:                                 // Instrução do tipo I (imediato)
+      rt = (instrucao->instrucao >> 16)
+         & 0x1F;                            // Extrai o registrador de destino
+      rs = (instrucao->instrucao >> 21) & 0x1F; // Extrai o registrador de fonte
+      imm = instrucao->instrucao & 0xFFFF;      // Extrai o valor imediato
       break;
-    case J: end = instrucao->instrucao & 0x3FFFFFF; break;
-    default: perror("Tipo de instrução não reconhecido"); exit(EXIT_FAILURE);
+    case J:                                     // Instrução do tipo J (salto)
+      end = instrucao->instrucao & 0x3FFFFFF;   // Extrai o destino do salto
+      break;
+    default:
+      perror(
+          "Tipo de instrução não reconhecido"); // Imprime um erro se o tipo de
+                                                // instrução não for reconhecido
+      exit(EXIT_FAILURE); // Sai do programa com falha
     }
 
+    // Verifica se o registrador 'rs' está sendo usado e passa para a próxima
+    // instrução.
     if (banco_registradores[rs]) {
       instrucao = instrucao->proximo;
       continue;
     }
 
+    // Verifica se o registrador 'rt' está sendo usado e passa para a próxima
+    // instrução.
     if (opcode != 0xD && banco_registradores[rt]) {
       instrucao = instrucao->proximo;
       continue;
     }
 
-    // Não tem RAW
+    // Não há dependência RAW, então a instrução pode ser executada.
     mandar_executar(instrucao);
 
+    // Dependendo do opcode, atualiza o status das unidades funcionais.
+    // Se o opcode estiver na faixa de 0 a 3
     if (opcode < 4) {
-      add_usados++;
-      add = banco_uf.add;
+      add_usados++; // Aumenta a contagem de unidades funcionais 'add' usadas
+      add = banco_uf.add; // Reinicia o ponteiro para unidades funcionais 'add'
+
+      // Enquanto houver unidades funcionais 'add'
       while (add) {
+        // Se a unidade funcional não estiver ocupada, configura a UF para
+        // execução.
         if (!add->busy) {
           add->busy     = 1;
           add->operacao = opcode;
@@ -213,10 +344,17 @@ leitura_operandos(void) {
 
         add++;
       }
-    } else if (opcode < 6) {
-      mul_usados++;
-      mul = banco_uf.mul;
+    }
+    // Se o opcode estiver na faixa de 4 a 5
+    else if (opcode < 6)
+    {
+      mul_usados++; // Aumenta a contagem de unidades funcionais 'mul' usadas
+      mul = banco_uf.mul; // Reinicia o ponteiro para unidades funcionais 'mul'
+
+      // Enquanto houver unidades funcionais 'mul'
       while (mul) {
+        // Se a unidade funcional não estiver ocupada, configura a UF para
+        // execução.
         if (!mul->busy) {
           mul->busy     = 1;
           mul->operacao = opcode;
@@ -232,10 +370,19 @@ leitura_operandos(void) {
 
         mul++;
       }
-    } else {
-      int_usados++;
-      inteiro = banco_uf.inteiro;
+    }
+    // Se o opcode não estiver nas faixas anteriores
+    else
+    {
+      int_usados++; // Aumenta a contagem de unidades funcionais 'inteiro'
+                    // usadas
+      inteiro = banco_uf.inteiro; // Reinicia o ponteiro para unidades
+                                  // funcionais 'inteiro'
+
+      // Enquanto houver unidades funcionais 'inteiro'
       while (inteiro) {
+        // Se a unidade funcional não estiver ocupada, configura a UF para
+        // execução.
         if (!inteiro->busy) {
           inteiro->busy     = 1;
           inteiro->operacao = opcode;
@@ -253,58 +400,88 @@ leitura_operandos(void) {
       }
     }
 
+    // Move para a próxima instrução.
     instrucao = instrucao->proximo;
   }
 }
 
+// A função é responsável por adicionar uma nova instrução à lista de emissão,
+// onde as instruções aguardam para serem emitidas para execução.
 internal void
 adicionar_instrucao(uint32_t instrucao) {
-  Instrucao_No *no     = (Instrucao_No *) malloc(sizeof(Instrucao_No));
-  no->instrucao        = instrucao;
-  no->proximo          = NULL;
-  no->clocks_restantes = ClockMap[instrucao >> 26];
-  no->tipo             = OpCodeTipo[instrucao >> 26];
+  local_persist uint32_t instrucoes_emitidas = 0;
 
+  Status_Instrucoes *status = status_instrucoes + instrucoes_emitidas;
+
+  status->busca    = 'X';
+  status->emissao  = '-';
+  status->leitura  = '-';
+  status->execucao = '-';
+  status->escrita  = '-';
+
+  // Aloca memória para um novo nó de instrução na lista de emissão
+  Instrucao_No *no = (Instrucao_No *) malloc(sizeof(Instrucao_No));
+
+  no->index = instrucoes_emitidas++;
+
+  // Preenche os campos do novo nó com informações da instrução
+  no->instrucao = instrucao;     // Armazena a instrução
+  no->proximo   = NULL;          // Inicializa o próximo nó como NULL
+  no->clocks_restantes =
+      ClockMap[instrucao >> 26]; // Define os clocks restantes com base no
+                                 // opcode da instrução
+  no->tipo =
+      OpCodeTipo[instrucao
+                 >> 26]; // Determina o tipo da instrução com base no opcode
+
+  // Verifica se a lista de emissão está vazia
   if (lista_emissao.cabeca == NULL) {
+    // Se estiver vazia, o novo nó se torna a cabeça e o fim da lista
     lista_emissao.cabeca = no;
     lista_emissao.fim    = no;
   } else {
+    // Se não estiver vazia, adiciona o novo nó no final da lista
     lista_emissao.fim->proximo = no;
-    lista_emissao.fim          = no;
+    lista_emissao.fim          = no; // Atualiza o fim da lista
   }
 }
 
+// A função é responsável por imprimir o estado do scoreboard, incluindo o
+// número de relógio atual(clock), o estado das instruções em diferentes
+// estágios, o estado das unidades funcionais e o estado dos registradores.
 internal void
 printar_scoreboard(void) {
+  // Variável estática persistente para manter o rastreamento do relógio
   local_persist uint32_t clock = 0;
 
-  Instrucao_No *instrucao_emitida = lista_emissao.cabeca;
-  Instrucao_No *instrucao_leitura = lista_leitura.cabeca;
-  Instrucao_No *instrucao_executa = lista_executando.cabeca;
-  Instrucao_No *instrucao_escrita = lista_escrita.cabeca;
-
+  // Imprime o número do relógio atual
   printf("Clock: %u\n", clock);
 
-  // Estado das instruções
+  // Imprime o estado das instruções
   printar_instrucoes();
 
-  // Estado das UFs
+  // Estado das unidades funcionais (UFs)
   UF *add     = banco_uf.add;
   UF *mul     = banco_uf.mul;
   UF *inteiro = banco_uf.inteiro;
 
+  // Imprime o estado das unidades funcionais
   printar_ufs();
 
-  // Estado dos registradores
+  // Imprime o estado dos registradores
   printar_status_registradores();
 
   printf(
       "---------------------------------------------------------------------"
       "-----------------\n");
 
+  // Incrementa o contador de relógio
   clock++;
 }
 
+// A função é responsável por emitir instruções para execução, considerando a
+// disponibilidade de Unidades Funcionais (UFs) e evitando conflitos Write After
+// Write (WAW) com instruções já em execução
 internal void
 emitir(void) {
   Instrucao_No *instrucao_emitida    = lista_emissao.cabeca;
@@ -312,6 +489,7 @@ emitir(void) {
 
   Banco_Registradores registradores_usados = { 0 };
 
+  // Verifica os registradores usados pelas instruções em execução
   while (instrucao_executando != NULL) {
     switch (instrucao_executando->tipo) {
     case R:
@@ -332,23 +510,29 @@ emitir(void) {
     instrucao_executando = instrucao_executando->proximo;
   }
 
+  // Emite as instruções para execução, considerando disponibilidade de UFs e
+  // evitando WAW
   while (instrucao_emitida != NULL) {
     uint8_t opcode = instrucao_emitida->instrucao >> 26;
 
-    // Checa se UF disponível
-    // Tá feio mas acho que tá certo
+    // Checa se UF disponível para a emissão da instrução
     if (opcode < 4 && add_usados < _cpu_specs.uf_add) {
+      // UF de adição disponível
     } else if (opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
+      // UF de multiplicação disponível
     } else if (opcode < 16 && int_usados < _cpu_specs.uf_int) {
+      // UF de inteiro disponível
     } else {
+      // UF não disponível para a instrução, passa para a próxima
       instrucao_emitida = instrucao_emitida->proximo;
       continue;
     }
 
-    // Checando WAW
+    // Checa se há WAW (escrever após escrever) para evitar conflitos
     switch (instrucao_emitida->tipo) {
     case R:
       if (!registradores_usados[(instrucao_emitida->instrucao >> 11) & 0x1F]) {
+        // Não há dependências de escrita, pode emitir a instrução para execução
         mandar_ler(instrucao_emitida);
       }
       break;
@@ -356,11 +540,15 @@ emitir(void) {
       if ((instrucao_emitida->instrucao >> 26) < 4) {
         if (!registradores_usados[(instrucao_emitida->instrucao >> 16) & 0x1F])
         {
+          // Não há dependências de escrita, pode emitir a instrução para
+          // execução
           mandar_ler(instrucao_emitida);
         }
       } else {
         if (!registradores_usados[(instrucao_emitida->instrucao >> 21) & 0x1F])
         {
+          // Não há dependências de escrita, pode emitir a instrução para
+          // execução
           mandar_ler(instrucao_emitida);
         }
       }
@@ -372,6 +560,9 @@ emitir(void) {
   }
 }
 
+// A função é responsável por escrever o resultado das instruções na lista de
+// escrita no barramento de dados e liberar as unidades funcionais
+// correspondentes para uso futuro.
 internal void
 escrever(void) {
   Instrucao_No *instrucao = lista_escrita.cabeca;
@@ -382,139 +573,206 @@ escrever(void) {
 
   Banco_Registradores registradores_usados = { 0 };
 
+  // Itera sobre as unidades funcionais (UFs) de adição
   for (uint i = 0; i < _cpu_specs.uf_add; i++) {
+    // Verifica se as UFs têm dependências de leitura (Qj e Qk)
     if (add->Qj) {
-      registradores_usados[add->Qj] = 1;
+      registradores_usados[add->Qj] = 1; // Registra o uso do registrador Qj
     }
     if (add->Qk) {
-      registradores_usados[add->Qk] = 1;
+      registradores_usados[add->Qk] = 1; // Registra o uso do registrador Qk
     }
 
     add++;
   }
 
+  // Itera sobre as unidades funcionais (UFs) de multiplicação
   for (uint i = 0; i < _cpu_specs.uf_mul; i++) {
+    // Verifica se as UFs têm dependências de leitura (Qj e Qk)
     if (mul->Qj) {
-      registradores_usados[mul->Qj] = 1;
+      registradores_usados[mul->Qj] = 1; // Registra o uso do registrador Qj
     }
     if (mul->Qk) {
-      registradores_usados[mul->Qk] = 1;
+      registradores_usados[mul->Qk] = 1; // Registra o uso do registrador Qk
     }
 
     mul++;
   }
 
+  // Itera sobre as unidades funcionais (UFs) de inteiro
   for (uint i = 0; i < _cpu_specs.uf_int; i++) {
+    // Verifica se as UFs têm dependências de leitura (Qj e Qk)
     if (inteiro->Qj) {
-      registradores_usados[inteiro->Qj] = 1;
+      registradores_usados[inteiro->Qj] = 1; // Registra o uso do registrador Qj
     }
     if (inteiro->Qk) {
-      registradores_usados[inteiro->Qk] = 1;
+      registradores_usados[inteiro->Qk] = 1; // Registra o uso do registrador Qk
     }
 
     inteiro++;
   }
 
+  // Itera sobre as instruções na lista de escrita
   while (instrucao != NULL) {
     uint8_t opcode = instrucao->instrucao >> 26;
-    if (opcode < 4) {
+
+    // Verifica o opcode para determinar o tipo de operação
+    if (opcode < 4) { // Instruções de adição
       add = banco_uf.add;
       for (int i = 0; i < instrucao->uf; i++) {
         add++;
       }
 
+      // Verifica se o registrador Fi da UF está sendo usado por outras
+      // instruções
       if (registradores_usados[add->Fi]) {
-        instrucao = instrucao->proximo;
+        instrucao =
+            instrucao
+                ->proximo; // Move para a próxima instrução na lista de escrita
         continue;
       }
 
-      add->busy = 0;
-      add_usados--;
+      add->busy = 0; // A UF está livre para ser utilizada
+      add_usados--;  // Decrementa o contador de UFs de adição em uso
 
+      Status_Instrucoes *status = status_instrucoes + instrucao->index;
+
+      status->escrita = '-';
+
+      // Escreve o resultado no barramento de dados
       barramento_escrever_dado(0, banco_registradores[add->Fi]);
-    } else if (opcode < 6) {
+    } else if (opcode < 6) { // Instruções de multiplicação
       mul = banco_uf.mul;
       for (int i = 0; i < instrucao->uf; i++) {
         mul++;
       }
 
+      // Verifica se o registrador Fi da UF está sendo usado por outras
+      // instruções
       if (registradores_usados[mul->Fi]) {
+        // Move para a próxima instrução na lista de escrita
         instrucao = instrucao->proximo;
         continue;
       }
 
-      mul->busy = 0;
-      mul_usados--;
+      mul->busy = 0; // A UF está livre para ser utilizada
+      mul_usados--;  // Decrementa o contador de UFs de multiplicação em uso
 
+      Status_Instrucoes *status = status_instrucoes + instrucao->index;
+
+      status->escrita = '-';
+
+      // Escreve o resultado no barramento de dados
       barramento_escrever_dado(0, banco_registradores[mul->Fi]);
-    } else if (opcode < 16) {
+    } else if (opcode < 16) { // Instruções de inteiro
       inteiro = banco_uf.inteiro;
       for (int i = 0; i < instrucao->uf; i++) {
         inteiro++;
       }
 
+      // Verifica se o registrador Fi da UF está sendo usado por outras
+      // instruções
       if (registradores_usados[inteiro->Fi]) {
+        // Move para a próxima instrução na lista de escrita
         instrucao = instrucao->proximo;
         continue;
       }
 
-      inteiro->busy = 0;
-      int_usados--;
+      inteiro->busy = 0; // A UF está livre para ser utilizada
+      int_usados--;      // Decrementa o contador de UFs de inteiro em uso
 
+      Status_Instrucoes *status = status_instrucoes + instrucao->index;
+
+      status->escrita = '-';
+
+      // Escreve o resultado no barramento de dados
       barramento_escrever_dado(0, banco_registradores[inteiro->Fi]);
-    } else {
-      rodando = 0;
     }
 
+    // Move para a próxima instrução na lista de escrita
     instrucao = instrucao->proximo;
   }
 }
 
+// A função é responsável por executar as instruções na lista de execução.
 internal void
 executar(void) {
   Instrucao_No *instrucao = lista_executando.cabeca;
 
+  // Itera sobre as instruções na lista de execução
   while (instrucao != NULL) {
+    // Verifica se a instrução ainda possui ciclos de clock a serem executados
     if (instrucao->clocks_restantes > 0) {
+      // Decrementa o contador de ciclos restantes para a instrução
+      Status_Instrucoes *status = status_instrucoes + instrucao->index;
+
+      status->leitura  = '-';
+      status->execucao = 'X';
+
       instrucao->clocks_restantes--;
     } else {
       // TODO: Atualizar UF
 
-      // Mandar para escrita
+      // Após a execução dos ciclos, a instrução está pronta para escrita
+      // Chama a função para enviar a instrução para a escrita
       mandar_escrever(instrucao);
     }
 
+    // Avança para a próxima instrução na lista de execução
     instrucao = instrucao->proximo;
   }
 }
 
+// A função é responsável por mover uma instrução da lista de emissão para a
+// lista de leitura, indicando que a instrução está pronta para ser buscada e
+// executada.
 internal void
 mandar_ler(Instrucao_No *instrucao) {
   Instrucao_No *emitida = lista_emissao.cabeca;
 
+  if (emitida) {
+    Status_Instrucoes *status = status_instrucoes + emitida->index;
+    status->busca             = '-';
+    status->emissao           = 'X';
+  }
+
+  // Verifica se a instrução a ser lida é a primeira na lista de emissão
   if (emitida == instrucao) {
+    // Remove a instrução da lista de emissão, pois está pronta para leitura
     lista_emissao.cabeca = NULL;
     lista_emissao.fim    = NULL;
 
+    // Verifica se a lista de leitura está vazia
     if (lista_leitura.cabeca == NULL) {
+      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+      // leitura
       lista_leitura.cabeca = instrucao;
       lista_leitura.fim    = instrucao;
     } else {
+      // Se não estiver vazia, adiciona a instrução no final da lista de leitura
       lista_leitura.fim->proximo = instrucao;
       lista_leitura.fim          = instrucao;
     }
   } else {
+    // Caso a instrução não seja a primeira na lista de emissão
     while (emitida && emitida->proximo != instrucao) {
       emitida = emitida->proximo;
     }
 
+    // Verifica se a instrução foi encontrada na lista de emissão
     if (emitida) {
+      // Remove a instrução da lista de emissão, pois está pronta para leitura
       emitida->proximo = instrucao->proximo;
 
+      // Verifica se a lista de leitura está vazia
       if (lista_leitura.cabeca == NULL) {
+        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+        // leitura
         lista_leitura.cabeca = instrucao;
         lista_leitura.fim    = instrucao;
       } else {
+        // Se não estiver vazia, adiciona a instrução no final da lista de
+        // leitura
         lista_leitura.fim->proximo = instrucao;
         lista_leitura.fim          = instrucao;
       }
@@ -522,33 +780,56 @@ mandar_ler(Instrucao_No *instrucao) {
   }
 }
 
+// A função é responsável por mover uma instrução da lista de leitura para a
+// lista de execução, indicando que a instrução está pronta para ser executada.
 internal void
 mandar_executar(Instrucao_No *instrucao) {
   Instrucao_No *leitura = lista_leitura.cabeca;
 
+  if (leitura) {
+    Status_Instrucoes *status = status_instrucoes + leitura->index;
+    status->emissao           = '-';
+    status->leitura           = 'X';
+  }
+
+  // Verifica se a instrução a ser executada é a primeira na lista de leitura
   if (leitura == instrucao) {
+    // Remove a instrução da lista de leitura, pois está pronta para execução
     lista_leitura.cabeca = NULL;
     lista_leitura.fim    = NULL;
 
+    // Verifica se a lista de execução está vazia
     if (lista_executando.cabeca == NULL) {
+      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+      // execução
       lista_executando.cabeca = instrucao;
       lista_executando.fim    = instrucao;
     } else {
+      // Se não estiver vazia, adiciona a instrução no final da lista de
+      // execução
       lista_executando.fim->proximo = instrucao;
       lista_executando.fim          = instrucao;
     }
   } else {
+    // Caso a instrução não seja a primeira na lista de leitura
     while (leitura && leitura->proximo != instrucao) {
       leitura = leitura->proximo;
     }
 
+    // Verifica se a instrução foi encontrada na lista de leitura
     if (leitura) {
+      // Remove a instrução da lista de leitura, pois está pronta para execução
       leitura->proximo = instrucao->proximo;
 
+      // Verifica se a lista de execução está vazia
       if (lista_executando.cabeca == NULL) {
+        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+        // execução
         lista_executando.cabeca = instrucao;
         lista_executando.fim    = instrucao;
       } else {
+        // Se não estiver vazia, adiciona a instrução no final da lista de
+        // execução
         lista_executando.fim->proximo = instrucao;
         lista_executando.fim          = instrucao;
       }
@@ -556,33 +837,56 @@ mandar_executar(Instrucao_No *instrucao) {
   }
 }
 
+// A função é responsável por mover uma instrução da lista de execução para a
+// lista de escrita, indicando que a instrução está pronta para escrever seu
+// resultado.
 internal void
 mandar_escrever(Instrucao_No *instrucao) {
   Instrucao_No *executando = lista_executando.cabeca;
 
+  if (executando) {
+    Status_Instrucoes *status = status_instrucoes + executando->index;
+    status->execucao          = '-';
+    status->escrita           = 'X';
+  }
+
+  // Verifica se a instrução a ser escrita é a primeira na lista de execução
   if (executando == instrucao) {
+    // Remove a instrução da lista de execução, pois está pronta para escrita
     lista_executando.cabeca = NULL;
     lista_executando.fim    = NULL;
 
+    // Verifica se a lista de escrita está vazia
     if (lista_escrita.cabeca == NULL) {
+      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+      // escrita
       lista_escrita.cabeca = instrucao;
       lista_escrita.fim    = instrucao;
     } else {
+      // Se não estiver vazia, adiciona a instrução no final da lista de escrita
       lista_escrita.fim->proximo = instrucao;
       lista_escrita.fim          = instrucao;
     }
   } else {
+    // Caso a instrução não seja a primeira na lista de execução
     while (executando && executando->proximo != instrucao) {
       executando = executando->proximo;
     }
 
+    // Verifica se a instrução foi encontrada na lista de execução
     if (executando) {
+      // Remove a instrução da lista de execução, pois está pronta para escrita
       executando->proximo = instrucao->proximo;
 
+      // Verifica se a lista de escrita está vazia
       if (lista_escrita.cabeca == NULL) {
+        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
+        // escrita
         lista_escrita.cabeca = instrucao;
         lista_escrita.fim    = instrucao;
       } else {
+        // Se não estiver vazia, adiciona a instrução no final da lista de
+        // escrita
         lista_escrita.fim->proximo = instrucao;
         lista_escrita.fim          = instrucao;
       }
@@ -590,6 +894,8 @@ mandar_escrever(Instrucao_No *instrucao) {
   }
 }
 
+// A função é responsável por imprimir o status das Unidades Funcionais (UFs) no
+// formato de uma tabela.
 internal void
 printar_ufs(void) {
   UF *add     = banco_uf.add;
@@ -636,26 +942,101 @@ printar_ufs(void) {
       "-----------------\n");
 }
 
+// A função é responsável por imprimir o status dos registradores, mostrando a
+// UF associada a cada registrador e sua posição atual.
 internal void
 printar_status_registradores(void) {
   printf("\nRegistradores:\n\n");
 
+  // Itera sobre os registradores
   for (uint i = 0; i < 32; i++) {
+    // Obtém o nome da UF associada ao registrador
     char *uf = Tipo_UF_Nome[status_registrador[i].uf];
+    // Imprime o status do registrador
     printf("R%u:\t%s\t%u\n", i, uf, status_registrador[i].pos);
   }
 }
 
+// A função é responsável por imprimir o status das instruções em cada etapa do
+// pipeline, incluindo busca, emissão, leitura, execução e escrita.
 internal void
 printar_instrucoes(void) {
-  printf("\nInstruções:\n\n");
+  printf(
+      "+----------------------------------+---------+--------+-------+---------"
+      "+--------+\n");
+  printf(
+      "| Instrução                        | Busca   | Emissão| Leitura| "
+      "Execução| Escrita|\n");
+  printf(
+      "+----------------------------------+---------+--------+-------+---------"
+      "+--------+\n");
   Status_Instrucoes *instrucao = status_instrucoes;
 
   for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
-    printf("%s\t%s\t%s\t%s\t%s\t%s\n", instrucao->instrucao,
-           instrucao->busca ? "X" : "-", instrucao->emissao ? "X" : "-",
-           instrucao->leitura ? "X" : "-", instrucao->execucao ? "X" : "-",
-           instrucao->escrita ? "X" : "-");
+    printf("| %32s | %c       | %c      | %c     | %c       | %c      |\n",
+           instrucao->instrucao, instrucao->busca, instrucao->emissao,
+           instrucao->leitura, instrucao->execucao, instrucao->escrita);
     instrucao++;
   }
+}
+
+internal void
+atualizar_instrucoes(void) {
+  // Status_Instrucoes *instrucao = status_instrucoes;
+  //
+  // for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+  //   instrucao->busca    = 0;
+  //   instrucao->emissao  = 0;
+  //   instrucao->leitura  = 0;
+  //   instrucao->execucao = 0;
+  //   instrucao->escrita  = 0;
+  //   instrucao++;
+  // }
+}
+
+internal const char *
+decodificar_instrucao(uint32_t i) {
+  uint32_t instrucao = barramento_buscar_instrucao(PC + i * 4);
+
+  char *saida;
+
+  uint8_t opcode = instrucao >> 26;
+
+  switch (OpCodeTipo[opcode]) {
+  case R:
+    if (opcode == 0x8) {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s r%u, r%u", OpNome[instrucao >> 26],
+              (instrucao >> 11) & 0x1F, (instrucao >> 21) & 0x1F);
+    } else {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s r%u, r%u, r%u", OpNome[instrucao >> 26],
+              (instrucao >> 11) & 0x1F, (instrucao >> 21) & 0x1F,
+              (instrucao >> 16) & 0x1F);
+    }
+    break;
+  case I:
+    if (opcode == 0xE || opcode == 0xF) {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s %u(r%u)", OpNome[instrucao >> 26], instrucao & 0xFFFF,
+              (instrucao >> 16) & 0x1F);
+    } else {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s r%u, r%u, %d", OpNome[instrucao >> 26],
+              (instrucao >> 16) & 0x1F, (instrucao >> 21) & 0x1F,
+              instrucao & 0xFFFF);
+    }
+    break;
+  case J:
+    if (opcode == 0x10) {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s", OpNome[instrucao >> 26]);
+    } else {
+      saida = (char *) malloc(32);
+      sprintf(saida, "%s %u", OpNome[instrucao >> 26], instrucao & 0x3FFFFFF);
+    }
+    break;
+  }
+
+  return saida;
 }

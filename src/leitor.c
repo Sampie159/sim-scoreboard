@@ -480,7 +480,7 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
 
     if (isalpha(l->ch)) {
       char *identificador = ler_identificador(l);
-      if (strncmp(identificador, "add", 3) == 0) {
+      if (strncmp(identificador, "addi", 4) == 0) {
         if (l->ch == ':') {
           prosseguir(l);
         } else {
@@ -488,8 +488,8 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
           exit(EXIT_FAILURE);
         }
         ignorar_espacos(l);
-        cpu_specs->clock_add = atoi(ler_identificador(l));
-      } else if (strncmp(identificador, "addi", 4) == 0) {
+        cpu_specs->clock_addi = atoi(ler_identificador(l));
+      } else if (strncmp(identificador, "add", 3) == 0) {
         if (l->ch == ':') {
           prosseguir(l);
         } else {
@@ -497,8 +497,8 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
           exit(EXIT_FAILURE);
         }
         ignorar_espacos(l);
-        cpu_specs->clock_addi = atoi(ler_identificador(l));
-      } else if (strncmp(identificador, "sub", 3) == 0) {
+        cpu_specs->clock_add = atoi(ler_identificador(l));
+      } else if (strncmp(identificador, "subi", 4) == 0) {
         if (l->ch == ':') {
           prosseguir(l);
         } else {
@@ -506,8 +506,8 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
           exit(EXIT_FAILURE);
         }
         ignorar_espacos(l);
-        cpu_specs->clock_sub = atoi(ler_identificador(l));
-      } else if (strncmp(identificador, "subi", 4) == 0) {
+        cpu_specs->clock_subi = atoi(ler_identificador(l));
+      } else if (strncmp(identificador, "sub", 3) == 0) {
         if (l->ch == ':') {
           prosseguir(l);
         } else {
@@ -515,7 +515,7 @@ ler_clocks(Leitor *l, CPU_Specs *cpu_specs) {
           exit(EXIT_FAILURE);
         }
         ignorar_espacos(l);
-        cpu_specs->clock_subi = atoi(ler_identificador(l));
+        cpu_specs->clock_sub = atoi(ler_identificador(l));
       } else if (strncmp(identificador, "mul", 3) == 0) {
         if (l->ch == ':') {
           prosseguir(l);

@@ -375,3 +375,7 @@ static tipo OpCodeTipo[] = {
 };
 
 static char *Tipo_UF_Nome[] = { "Add", "Mul", "Int" };
+
+static char *OpNome[] = { "add", "addi", "sub", "subi", "mul", "div",
+                          "and", "or",   "not", "blt",  "bgt", "beq",
+                          "bne", "j",    "lw",  "sw",   "exit" };

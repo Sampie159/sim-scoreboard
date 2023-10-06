@@ -44,8 +44,8 @@ main(int argc, char *argv[]) {
 
   leitor_ler_arquivo(buffer, memoria, &cpu_specs);
 
-  scoreboard_inicializar(&cpu_specs);
   barramento_inicializar(memoria);
+  scoreboard_inicializar(&cpu_specs);
   rodar_programa(programa.nome_saida);
 
   return 0;

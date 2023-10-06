@@ -33,7 +33,9 @@
 
 #line 1 "opcodehash"
 
+#include "cpu.h"
 #include "memoria.h"
+
 #line 15 "opcodehash"
 
 struct OpCodeMap {
@@ -379,3 +381,8 @@ static char *Tipo_UF_Nome[] = { "Add", "Mul", "Int" };
 static char *OpNome[] = { "add", "addi", "sub", "subi", "mul", "div",
                           "and", "or",   "not", "blt",  "bgt", "beq",
                           "bne", "j",    "lw",  "sw",   "exit" };
+
+static Tipo_UF Tipos_UF[] = { add,     add,     add,     add,     mul,
+                              mul,     inteiro, inteiro, inteiro, inteiro,
+                              inteiro, inteiro, inteiro, inteiro, inteiro,
+                              inteiro, inteiro };

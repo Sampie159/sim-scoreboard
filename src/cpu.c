@@ -9,12 +9,9 @@
 #include "hashtables.h"
 #include "memoria.h"
 
-// Define uma estrutura para armazenar uma lista de instruções no pipeline.
-typedef struct _lista_instrucoes Lista_Instrucoes;
-
 // Define uma estrutura para armazenar informações sobre uma instrução no
 // pipeline.
-typedef struct _instrucao_no Instrucao_No;
+typedef struct _instrucao Instrucao;
 
 // Define uma estrutura para armazenar informações sobre o status de um
 // registrador.
@@ -29,20 +26,13 @@ typedef struct _status_instrucoes Status_Instrucoes;
 typedef enum _tipo_uf { add, mul, inteiro } Tipo_UF;
 
 // Define a estrutura de uma instrução no pipeline.
-struct _instrucao_no {
+struct _instrucao {
   uint32_t instrucao;        // A instrução em si (32 bits).
   int      clocks_restantes; // Quantidade de ciclos de clock restantes para
                              // conclusão.
-  tipo          tipo;        // O tipo de UF a que a instrução pertence.
-  int           uf;          // O índice da UF a que a instrução pertence.
-  Instrucao_No *proximo;     // Ponteiro para a próxima instrução na lista.
-  int           index;
-};
-
-// Define uma estrutura para representar uma lista de instruções no pipeline.
-struct _lista_instrucoes {
-  Instrucao_No *cabeca; // Ponteiro para a primeira instrução da lista.
-  Instrucao_No *fim;    // Ponteiro para a última instrução da lista.
+  tipo tipo;                 // O tipo de UF a que a instrução pertence.
+  int  uf;                   // O índice da UF a que a instrução pertence.
+  int  index;
 };
 
 // Define uma estrutura para armazenar informações sobre o status de um
@@ -63,13 +53,13 @@ struct _status_instrucoes {
   char escrita;  // Indica se a instrução está na etapa de escrita.
 };
 
+global Instrucao *lista_emissao = NULL;    // Lista de instruções em emissão.
+global Instrucao *lista_leitura = NULL;    // Lista de instruções em leitura.
+global Instrucao *lista_executando = NULL; // Lista de instruções em execução.
+global Instrucao *lista_escrita = NULL;    // Lista de instruções em escrita.
+
 // Variáveis globais para armazenar listas de instruções em diferentes etapas do
 // pipeline.
-global Lista_Instrucoes lista_emissao    = { 0 };
-global Lista_Instrucoes lista_leitura    = { 0 };
-global Lista_Instrucoes lista_executando = { 0 };
-global Lista_Instrucoes lista_escrita    = { 0 };
-global Lista_Instrucoes lista_concluida  = { 0 };
 
 // Array para mapear tempos de clock para cada tipo de instrução.
 global uint32_t ClockMap[17] = { 0 };
@@ -108,9 +98,9 @@ internal void        emitir(void);
 internal void        leitura_operandos(void);
 internal void        executar(void);
 internal void        escrever(void);
-internal void        mandar_ler(Instrucao_No *instrucao);
-internal void        mandar_executar(Instrucao_No *instrucao);
-internal void        mandar_escrever(Instrucao_No *instrucao);
+internal void        mandar_ler(Instrucao *instrucao);
+internal void        mandar_executar(Instrucao *instrucao);
+internal void        mandar_escrever(Instrucao *instrucao);
 internal void        printar_ufs(void);
 internal void        printar_status_registradores(void);
 internal void        printar_instrucoes(void);
@@ -154,6 +144,44 @@ scoreboard_inicializar(CPU_Specs *cpu_specs) {
   // quantidade de instruções
   status_instrucoes = (Status_Instrucoes *) malloc(sizeof(Status_Instrucoes)
                                                    * _cpu_specs.qtd_instrucoes);
+
+  lista_emissao =
+      (Instrucao *) malloc(sizeof(Instrucao) * _cpu_specs.qtd_instrucoes);
+
+  lista_leitura =
+      (Instrucao *) malloc(sizeof(Instrucao) * _cpu_specs.qtd_instrucoes);
+
+  lista_executando =
+      (Instrucao *) malloc(sizeof(Instrucao) * _cpu_specs.qtd_instrucoes);
+
+  lista_escrita =
+      (Instrucao *) malloc(sizeof(Instrucao) * _cpu_specs.qtd_instrucoes);
+
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    lista_emissao[i].instrucao        = 0;
+    lista_emissao[i].uf               = -1;
+    lista_emissao[i].index            = -1;
+    lista_emissao[i].tipo             = -1;
+    lista_emissao[i].clocks_restantes = -1;
+
+    lista_leitura[i].instrucao        = 0;
+    lista_leitura[i].uf               = -1;
+    lista_leitura[i].index            = -1;
+    lista_leitura[i].tipo             = -1;
+    lista_leitura[i].clocks_restantes = -1;
+
+    lista_executando[i].instrucao        = 0;
+    lista_executando[i].uf               = -1;
+    lista_executando[i].index            = -1;
+    lista_executando[i].tipo             = -1;
+    lista_executando[i].clocks_restantes = -1;
+
+    lista_escrita[i].instrucao        = 0;
+    lista_escrita[i].uf               = -1;
+    lista_escrita[i].index            = -1;
+    lista_escrita[i].tipo             = -1;
+    lista_escrita[i].clocks_restantes = -1;
+  }
 
   Status_Instrucoes *instrucao = status_instrucoes;
 
@@ -264,11 +292,11 @@ leitura_operandos(void) {
     inteiro++;
   }
 
-  // Checa a dependência RAW (Read-After-Write) nas instruções.
-  Instrucao_No *instrucao = lista_leitura.cabeca;
-
   // Enquanto houver instruções na lista
-  while (instrucao != NULL) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    // Encontra a instrução atual
+    Instrucao *instrucao = lista_leitura + i;
+
     uint8_t opcode = instrucao->instrucao >> 26; // Extrai o opcode da instrução
     int8_t rd = -1, rs = -1,
            rt   = -1; // Inicializa registradores de destino, fonte 1 e fonte 2
@@ -305,14 +333,12 @@ leitura_operandos(void) {
     // Verifica se o registrador 'rs' está sendo usado e passa para a próxima
     // instrução.
     if (banco_registradores[rs]) {
-      instrucao = instrucao->proximo;
       continue;
     }
 
     // Verifica se o registrador 'rt' está sendo usado e passa para a próxima
     // instrução.
     if (opcode != 0xD && banco_registradores[rt]) {
-      instrucao = instrucao->proximo;
       continue;
     }
 
@@ -399,9 +425,6 @@ leitura_operandos(void) {
         inteiro++;
       }
     }
-
-    // Move para a próxima instrução.
-    instrucao = instrucao->proximo;
   }
 }
 
@@ -420,30 +443,21 @@ adicionar_instrucao(uint32_t instrucao) {
   status->escrita  = '-';
 
   // Aloca memória para um novo nó de instrução na lista de emissão
-  Instrucao_No *no = (Instrucao_No *) malloc(sizeof(Instrucao_No));
+  Instrucao no;
 
-  no->index = instrucoes_emitidas++;
+  no.index = instrucoes_emitidas;
 
   // Preenche os campos do novo nó com informações da instrução
-  no->instrucao = instrucao;     // Armazena a instrução
-  no->proximo   = NULL;          // Inicializa o próximo nó como NULL
-  no->clocks_restantes =
-      ClockMap[instrucao >> 26]; // Define os clocks restantes com base no
-                                 // opcode da instrução
-  no->tipo =
-      OpCodeTipo[instrucao
-                 >> 26]; // Determina o tipo da instrução com base no opcode
+  no.instrucao = instrucao; // Armazena a instrução
+  // Define os clocks restantes com base no opcode da instrução
+  no.clocks_restantes = ClockMap[instrucao >> 26];
+  // Determina o tipo da instrução com base no opcode
+  no.tipo = OpCodeTipo[instrucao >> 26];
 
-  // Verifica se a lista de emissão está vazia
-  if (lista_emissao.cabeca == NULL) {
-    // Se estiver vazia, o novo nó se torna a cabeça e o fim da lista
-    lista_emissao.cabeca = no;
-    lista_emissao.fim    = no;
-  } else {
-    // Se não estiver vazia, adiciona o novo nó no final da lista
-    lista_emissao.fim->proximo = no;
-    lista_emissao.fim          = no; // Atualiza o fim da lista
-  }
+  // Adiciona o nó à lista de emissão
+  lista_emissao[instrucoes_emitidas] = no;
+
+  instrucoes_emitidas++;
 }
 
 // A função é responsável por imprimir o estado do scoreboard, incluindo o
@@ -484,79 +498,71 @@ printar_scoreboard(void) {
 // Write (WAW) com instruções já em execução
 internal void
 emitir(void) {
-  Instrucao_No *instrucao_emitida    = lista_emissao.cabeca;
-  Instrucao_No *instrucao_executando = lista_executando.cabeca;
-
   Banco_Registradores registradores_usados = { 0 };
 
   // Verifica os registradores usados pelas instruções em execução
-  while (instrucao_executando != NULL) {
-    switch (instrucao_executando->tipo) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *instrucao = lista_executando + i;
+    switch (instrucao->tipo) {
     case R:
-      registradores_usados[(instrucao_executando->instrucao >> 11) & 0x1F] = 1;
+      registradores_usados[(instrucao->instrucao >> 11) & 0x1F] = 1;
       break;
     case I:
-      if ((instrucao_executando->instrucao >> 26) < 4) {
-        registradores_usados[(instrucao_executando->instrucao >> 16) & 0x1F] =
-            1;
+      if ((instrucao->instrucao >> 26) < 4) {
+        registradores_usados[(instrucao->instrucao >> 16) & 0x1F] = 1;
       } else {
-        registradores_usados[(instrucao_executando->instrucao >> 21) & 0x1F] =
-            1;
+        registradores_usados[(instrucao->instrucao >> 21) & 0x1F] = 1;
       }
       break;
-    case J: break;
+    case J:
+    default: break;
     }
-
-    instrucao_executando = instrucao_executando->proximo;
   }
 
   // Emite as instruções para execução, considerando disponibilidade de UFs e
   // evitando WAW
-  while (instrucao_emitida != NULL) {
-    uint8_t opcode = instrucao_emitida->instrucao >> 26;
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *instrucao = lista_emissao + i;
+
+    uint8_t opcode = instrucao->instrucao >> 26;
 
     // Checa se UF disponível para a emissão da instrução
     if (opcode < 4 && add_usados < _cpu_specs.uf_add) {
       // UF de adição disponível
-    } else if (opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
+    } else if (opcode >= 4 && opcode < 6 && mul_usados < _cpu_specs.uf_mul) {
       // UF de multiplicação disponível
-    } else if (opcode < 16 && int_usados < _cpu_specs.uf_int) {
+    } else if (opcode >= 6 && opcode < 16 && int_usados < _cpu_specs.uf_int) {
       // UF de inteiro disponível
     } else {
       // UF não disponível para a instrução, passa para a próxima
-      instrucao_emitida = instrucao_emitida->proximo;
       continue;
     }
 
     // Checa se há WAW (escrever após escrever) para evitar conflitos
-    switch (instrucao_emitida->tipo) {
+    switch (instrucao->tipo) {
     case R:
-      if (!registradores_usados[(instrucao_emitida->instrucao >> 11) & 0x1F]) {
+      if (!registradores_usados[(instrucao->instrucao >> 11) & 0x1F]) {
         // Não há dependências de escrita, pode emitir a instrução para execução
-        mandar_ler(instrucao_emitida);
+        mandar_ler(instrucao);
       }
       break;
     case I:
-      if ((instrucao_emitida->instrucao >> 26) < 4) {
-        if (!registradores_usados[(instrucao_emitida->instrucao >> 16) & 0x1F])
-        {
+      if ((instrucao->instrucao >> 26) < 4) {
+        if (!registradores_usados[(instrucao->instrucao >> 16) & 0x1F]) {
           // Não há dependências de escrita, pode emitir a instrução para
           // execução
-          mandar_ler(instrucao_emitida);
+          mandar_ler(instrucao);
         }
       } else {
-        if (!registradores_usados[(instrucao_emitida->instrucao >> 21) & 0x1F])
-        {
+        if (!registradores_usados[(instrucao->instrucao >> 21) & 0x1F]) {
           // Não há dependências de escrita, pode emitir a instrução para
           // execução
-          mandar_ler(instrucao_emitida);
+          mandar_ler(instrucao);
         }
       }
       break;
     case J: break;
     }
-
-    instrucao_emitida = instrucao_emitida->proximo;
   }
 }
 
@@ -565,8 +571,6 @@ emitir(void) {
 // correspondentes para uso futuro.
 internal void
 escrever(void) {
-  Instrucao_No *instrucao = lista_escrita.cabeca;
-
   UF *add     = banco_uf.add;
   UF *mul     = banco_uf.mul;
   UF *inteiro = banco_uf.inteiro;
@@ -613,7 +617,9 @@ escrever(void) {
   }
 
   // Itera sobre as instruções na lista de escrita
-  while (instrucao != NULL) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *instrucao = lista_escrita + i;
+
     uint8_t opcode = instrucao->instrucao >> 26;
 
     // Verifica o opcode para determinar o tipo de operação
@@ -626,9 +632,7 @@ escrever(void) {
       // Verifica se o registrador Fi da UF está sendo usado por outras
       // instruções
       if (registradores_usados[add->Fi]) {
-        instrucao =
-            instrucao
-                ->proximo; // Move para a próxima instrução na lista de escrita
+        // Move para a próxima instrução na lista de escrita
         continue;
       }
 
@@ -651,7 +655,6 @@ escrever(void) {
       // instruções
       if (registradores_usados[mul->Fi]) {
         // Move para a próxima instrução na lista de escrita
-        instrucao = instrucao->proximo;
         continue;
       }
 
@@ -674,7 +677,6 @@ escrever(void) {
       // instruções
       if (registradores_usados[inteiro->Fi]) {
         // Move para a próxima instrução na lista de escrita
-        instrucao = instrucao->proximo;
         continue;
       }
 
@@ -688,19 +690,15 @@ escrever(void) {
       // Escreve o resultado no barramento de dados
       barramento_escrever_dado(0, banco_registradores[inteiro->Fi]);
     }
-
-    // Move para a próxima instrução na lista de escrita
-    instrucao = instrucao->proximo;
   }
 }
 
 // A função é responsável por executar as instruções na lista de execução.
 internal void
 executar(void) {
-  Instrucao_No *instrucao = lista_executando.cabeca;
-
   // Itera sobre as instruções na lista de execução
-  while (instrucao != NULL) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *instrucao = lista_executando + i;
     // Verifica se a instrução ainda possui ciclos de clock a serem executados
     if (instrucao->clocks_restantes > 0) {
       // Decrementa o contador de ciclos restantes para a instrução
@@ -717,9 +715,6 @@ executar(void) {
       // Chama a função para enviar a instrução para a escrita
       mandar_escrever(instrucao);
     }
-
-    // Avança para a próxima instrução na lista de execução
-    instrucao = instrucao->proximo;
   }
 }
 
@@ -727,55 +722,18 @@ executar(void) {
 // lista de leitura, indicando que a instrução está pronta para ser buscada e
 // executada.
 internal void
-mandar_ler(Instrucao_No *instrucao) {
-  Instrucao_No *emitida = lista_emissao.cabeca;
+mandar_ler(Instrucao *instrucao) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *emissao = lista_emissao + i;
 
-  if (emitida) {
-    Status_Instrucoes *status = status_instrucoes + emitida->index;
-    status->busca             = '-';
-    status->emissao           = 'X';
-  }
-
-  // Verifica se a instrução a ser lida é a primeira na lista de emissão
-  if (emitida == instrucao) {
-    // Remove a instrução da lista de emissão, pois está pronta para leitura
-    lista_emissao.cabeca = NULL;
-    lista_emissao.fim    = NULL;
-
-    // Verifica se a lista de leitura está vazia
-    if (lista_leitura.cabeca == NULL) {
-      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-      // leitura
-      lista_leitura.cabeca = instrucao;
-      lista_leitura.fim    = instrucao;
-    } else {
-      // Se não estiver vazia, adiciona a instrução no final da lista de leitura
-      lista_leitura.fim->proximo = instrucao;
-      lista_leitura.fim          = instrucao;
-    }
-  } else {
-    // Caso a instrução não seja a primeira na lista de emissão
-    while (emitida && emitida->proximo != instrucao) {
-      emitida = emitida->proximo;
-    }
-
-    // Verifica se a instrução foi encontrada na lista de emissão
-    if (emitida) {
+    if (emissao == instrucao) {
       // Remove a instrução da lista de emissão, pois está pronta para leitura
-      emitida->proximo = instrucao->proximo;
 
-      // Verifica se a lista de leitura está vazia
-      if (lista_leitura.cabeca == NULL) {
-        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-        // leitura
-        lista_leitura.cabeca = instrucao;
-        lista_leitura.fim    = instrucao;
-      } else {
-        // Se não estiver vazia, adiciona a instrução no final da lista de
-        // leitura
-        lista_leitura.fim->proximo = instrucao;
-        lista_leitura.fim          = instrucao;
-      }
+      status_instrucoes[i].emissao = '-';
+      status_instrucoes[i].leitura = 'X';
+
+      lista_emissao[i] = (Instrucao){ 0 };
+      lista_leitura[i] = *instrucao;
     }
   }
 }
@@ -783,56 +741,18 @@ mandar_ler(Instrucao_No *instrucao) {
 // A função é responsável por mover uma instrução da lista de leitura para a
 // lista de execução, indicando que a instrução está pronta para ser executada.
 internal void
-mandar_executar(Instrucao_No *instrucao) {
-  Instrucao_No *leitura = lista_leitura.cabeca;
+mandar_executar(Instrucao *instrucao) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *leitura = lista_leitura + i;
 
-  if (leitura) {
-    Status_Instrucoes *status = status_instrucoes + leitura->index;
-    status->emissao           = '-';
-    status->leitura           = 'X';
-  }
-
-  // Verifica se a instrução a ser executada é a primeira na lista de leitura
-  if (leitura == instrucao) {
-    // Remove a instrução da lista de leitura, pois está pronta para execução
-    lista_leitura.cabeca = NULL;
-    lista_leitura.fim    = NULL;
-
-    // Verifica se a lista de execução está vazia
-    if (lista_executando.cabeca == NULL) {
-      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-      // execução
-      lista_executando.cabeca = instrucao;
-      lista_executando.fim    = instrucao;
-    } else {
-      // Se não estiver vazia, adiciona a instrução no final da lista de
-      // execução
-      lista_executando.fim->proximo = instrucao;
-      lista_executando.fim          = instrucao;
-    }
-  } else {
-    // Caso a instrução não seja a primeira na lista de leitura
-    while (leitura && leitura->proximo != instrucao) {
-      leitura = leitura->proximo;
-    }
-
-    // Verifica se a instrução foi encontrada na lista de leitura
-    if (leitura) {
+    if (leitura == instrucao) {
       // Remove a instrução da lista de leitura, pois está pronta para execução
-      leitura->proximo = instrucao->proximo;
 
-      // Verifica se a lista de execução está vazia
-      if (lista_executando.cabeca == NULL) {
-        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-        // execução
-        lista_executando.cabeca = instrucao;
-        lista_executando.fim    = instrucao;
-      } else {
-        // Se não estiver vazia, adiciona a instrução no final da lista de
-        // execução
-        lista_executando.fim->proximo = instrucao;
-        lista_executando.fim          = instrucao;
-      }
+      status_instrucoes[i].leitura  = '-';
+      status_instrucoes[i].execucao = 'X';
+
+      lista_leitura[i]    = (Instrucao){ 0 };
+      lista_executando[i] = *instrucao;
     }
   }
 }
@@ -841,55 +761,18 @@ mandar_executar(Instrucao_No *instrucao) {
 // lista de escrita, indicando que a instrução está pronta para escrever seu
 // resultado.
 internal void
-mandar_escrever(Instrucao_No *instrucao) {
-  Instrucao_No *executando = lista_executando.cabeca;
+mandar_escrever(Instrucao *instrucao) {
+  for (uint i = 0; i < _cpu_specs.qtd_instrucoes; i++) {
+    Instrucao *executando = lista_executando + i;
 
-  if (executando) {
-    Status_Instrucoes *status = status_instrucoes + executando->index;
-    status->execucao          = '-';
-    status->escrita           = 'X';
-  }
-
-  // Verifica se a instrução a ser escrita é a primeira na lista de execução
-  if (executando == instrucao) {
-    // Remove a instrução da lista de execução, pois está pronta para escrita
-    lista_executando.cabeca = NULL;
-    lista_executando.fim    = NULL;
-
-    // Verifica se a lista de escrita está vazia
-    if (lista_escrita.cabeca == NULL) {
-      // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-      // escrita
-      lista_escrita.cabeca = instrucao;
-      lista_escrita.fim    = instrucao;
-    } else {
-      // Se não estiver vazia, adiciona a instrução no final da lista de escrita
-      lista_escrita.fim->proximo = instrucao;
-      lista_escrita.fim          = instrucao;
-    }
-  } else {
-    // Caso a instrução não seja a primeira na lista de execução
-    while (executando && executando->proximo != instrucao) {
-      executando = executando->proximo;
-    }
-
-    // Verifica se a instrução foi encontrada na lista de execução
-    if (executando) {
+    if (executando == instrucao) {
       // Remove a instrução da lista de execução, pois está pronta para escrita
-      executando->proximo = instrucao->proximo;
 
-      // Verifica se a lista de escrita está vazia
-      if (lista_escrita.cabeca == NULL) {
-        // Se estiver vazia, a instrução se torna a cabeça e o fim da lista de
-        // escrita
-        lista_escrita.cabeca = instrucao;
-        lista_escrita.fim    = instrucao;
-      } else {
-        // Se não estiver vazia, adiciona a instrução no final da lista de
-        // escrita
-        lista_escrita.fim->proximo = instrucao;
-        lista_escrita.fim          = instrucao;
-      }
+      status_instrucoes[i].execucao = '-';
+      status_instrucoes[i].escrita  = 'X';
+
+      lista_executando[i] = (Instrucao){ 0 };
+      lista_escrita[i]    = *instrucao;
     }
   }
 }
